@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark brown brand palette */
+    --background: 35 20% 97%;
+    --foreground: 25 25% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 25 25% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 25 25% 12%;
+    --primary: 22 62% 22%;          /* #5C3117 dark brown */
+    --primary-foreground: 35 40% 96%;
+    --secondary: 30 18% 92%;
+    --secondary-foreground: 25 25% 20%;
+    --muted: 30 12% 93%;
+    --muted-foreground: 25 10% 48%;
+    --accent: 30 25% 90%;
+    --accent-foreground: 25 25% 20%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 30 15% 86%;
+    --input: 30 15% 86%;
+    --ring: 22 62% 22%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+  }
+}
+
+@media print {
+  @page {
+    size: A5;
+    margin: 12mm;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  nav, aside, header {
+    display: none !important;
+  }
+  #invoice-print {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}
