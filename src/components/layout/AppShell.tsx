@@ -33,11 +33,10 @@ export default function AppShell() {
       <div className="p-4">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg flex-shrink-0">
-            χ
+            B
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">Chi Dental Lab</p>
-            <p className="text-xs text-gray-400 truncate">Sdn Bhd</p>
+            <p className="text-sm font-semibold text-gray-900 truncate">BigPOS</p>
           </div>
         </div>
       </div>

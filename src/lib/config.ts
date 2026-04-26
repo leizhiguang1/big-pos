@@ -1,5 +1,5 @@
 export const COMPANY = {
-  name: 'Chi Dental Lab Sdn Bhd',
+  name: 'BigPOS',
   address: 'No179-1 Jalan SS 2/24, SS 2, 47300 Petaling Jaya, Selangor',
   phone: '01155627949',
   email: 'chidentallab@gmail.com',
