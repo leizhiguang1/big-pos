@@ -1,5 +1,8 @@
+'use client'
+
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +22,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warn
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [stats, setStats] = useState({ revenue: 0, outstanding: 0, invoiceCount: 0, customerCount: 0 })
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -68,7 +72,7 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500 mt-0.5">Welcome back</p>
         </div>
         <Button asChild>
-          <Link to="/invoices/new"><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
+          <Link href="/invoices/new"><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
         </Button>
       </div>
 
@@ -118,7 +122,7 @@ export default function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Recent Invoices</CardTitle>
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/invoices">View all</Link>
+            <Link href="/invoices">View all</Link>
           </Button>
         </CardHeader>
         <CardContent className="p-0">
@@ -139,7 +143,7 @@ export default function DashboardPage() {
                 </TableRow>
               )}
               {recentInvoices.map(inv => (
-                <TableRow key={inv.id} className="cursor-pointer" onClick={() => window.location.href = `/invoices/${inv.id}`}>
+                <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
                   <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
                   <TableCell>{(inv.customers as { clinic_name: string })?.clinic_name ?? '—'}</TableCell>
                   <TableCell className="text-gray-500">{formatDate(inv.invoice_date)}</TableCell>

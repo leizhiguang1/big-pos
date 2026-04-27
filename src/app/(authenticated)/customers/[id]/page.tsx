@@ -1,5 +1,8 @@
+'use client'
+
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,8 +18,8 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warn
 }
 
 export default function CustomerDetailPage() {
-  const { id } = useParams()
-  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,7 +48,7 @@ export default function CustomerDetailPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -55,10 +58,10 @@ export default function CustomerDetailPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/customers/${id}/edit`}><Edit className="h-4 w-4 mr-2" />Edit</Link>
+            <Link href={`/customers/${id}/edit`}><Edit className="h-4 w-4 mr-2" />Edit</Link>
           </Button>
           <Button size="sm" asChild>
-            <Link to={`/invoices/new?customer=${id}`}><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
+            <Link href={`/invoices/new?customer=${id}`}><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
           </Button>
         </div>
       </div>
@@ -143,7 +146,7 @@ export default function CustomerDetailPage() {
                 <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">No invoices yet</TableCell></TableRow>
               )}
               {invoices.map(inv => (
-                <TableRow key={inv.id} className="cursor-pointer" onClick={() => navigate(`/invoices/${inv.id}`)}>
+                <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
                   <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
                   <TableCell className="text-gray-500 text-sm">{formatDate(inv.invoice_date)}</TableCell>
                   <TableCell className="text-gray-500 text-sm">{formatDate(inv.due_date)}</TableCell>

@@ -1,5 +1,8 @@
+'use client'
+
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,7 +19,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warn
 }
 
 export default function InvoicesPage() {
-  const navigate = useNavigate()
+  const router = useRouter()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [filtered, setFiltered] = useState<Invoice[]>([])
   const [search, setSearch] = useState('')
@@ -56,7 +59,7 @@ export default function InvoicesPage() {
           <p className="text-sm text-gray-500 mt-0.5">{invoices.length} total</p>
         </div>
         <Button asChild>
-          <Link to="/invoices/new"><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
+          <Link href="/invoices/new"><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
         </Button>
       </div>
 
@@ -98,7 +101,7 @@ export default function InvoicesPage() {
               {loading && <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
               {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">No invoices found</TableCell></TableRow>}
               {filtered.map(inv => (
-                <TableRow key={inv.id} className="cursor-pointer" onClick={() => navigate(`/invoices/${inv.id}`)}>
+                <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
                   <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
                   <TableCell className="text-gray-700">{(inv.customers as { clinic_name: string })?.clinic_name ?? '—'}</TableCell>
                   <TableCell className="text-gray-500 text-sm">{formatDate(inv.invoice_date)}</TableCell>

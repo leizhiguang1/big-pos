@@ -1,5 +1,8 @@
+'use client'
+
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, Package, BarChart3,
   LogOut, Menu, X, ChevronRight,
@@ -11,21 +14,23 @@ import { COMPANY } from '@/lib/config'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/customers', icon: Users, label: 'Customers' },
-  { to: '/invoices', icon: FileText, label: 'Invoices' },
-  { to: '/products', icon: Package, label: 'Products' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/customers', icon: Users, label: 'Customers' },
+  { href: '/invoices', icon: FileText, label: 'Invoices' },
+  { href: '/products', icon: Package, label: 'Products' },
+  { href: '/reports', icon: BarChart3, label: 'Reports' },
 ]
 
-export default function AppShell() {
+export default function AppShell({ children }: { children: React.ReactNode }) {
   const { username, role, signOut } = useAuth()
-  const navigate = useNavigate()
+  const router = useRouter()
+  const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const handleSignOut = async () => {
     await signOut()
-    navigate('/login')
+    router.push('/login')
+    router.refresh()
   }
 
   const SidebarContent = () => (
@@ -44,25 +49,26 @@ export default function AppShell() {
       <Separator />
 
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) =>
-              cn(
+        {navItems.map(({ href, icon: Icon, label }) => {
+          const isActive = pathname === href || pathname.startsWith(`${href}/`)
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setSidebarOpen(false)}
+              className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-primary text-primary-foreground'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-              )
-            }
-          >
-            <Icon className="h-4 w-4 flex-shrink-0" />
-            {label}
-            <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-40" />
-          </NavLink>
-        ))}
+              )}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              {label}
+              <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-40" />
+            </Link>
+          )
+        })}
       </nav>
 
       <Separator />
@@ -113,7 +119,7 @@ export default function AppShell() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <Outlet />
+          {children}
         </main>
       </div>
     </div>

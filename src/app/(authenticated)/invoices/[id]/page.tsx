@@ -1,5 +1,8 @@
+'use client'
+
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +16,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban } from 'lucide-react'
@@ -33,8 +35,8 @@ const paymentSchema = z.object({
 type PaymentForm = z.infer<typeof paymentSchema>
 
 export default function InvoiceDetailPage() {
-  const { id } = useParams()
-  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const { user } = useAuth()
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -128,7 +130,7 @@ export default function InvoiceDetailPage() {
       {/* Actions bar — hidden on print */}
       <div className="flex items-center justify-between print:hidden">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -136,7 +138,7 @@ export default function InvoiceDetailPage() {
               <h1 className="text-2xl font-bold text-gray-900">{invoice.invoice_number}</h1>
               <Badge variant={STATUS_VARIANT[invoice.status] ?? 'secondary'} className="capitalize">{invoice.status}</Badge>
             </div>
-            <Link to={`/customers/${invoice.customer_id}`} className="text-sm text-primary hover:underline">
+            <Link href={`/customers/${invoice.customer_id}`} className="text-sm text-primary hover:underline">
               {customer?.clinic_name}
             </Link>
           </div>

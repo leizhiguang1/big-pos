@@ -1,4 +1,7 @@
+'use client'
+
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -16,6 +19,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warn
 }
 
 export default function ReportsPage() {
+  const router = useRouter()
   const [dateFrom, setDateFrom] = useState(format(startOfMonth(subMonths(new Date(), 0)), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'))
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -137,7 +141,7 @@ export default function ReportsPage() {
                 <TableBody>
                   {outstanding.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">No outstanding invoices</TableCell></TableRow>}
                   {outstanding.map(inv => (
-                    <TableRow key={inv.id} className="cursor-pointer" onClick={() => window.location.href = `/invoices/${inv.id}`}>
+                    <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
                       <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
                       <TableCell>{(inv.customers as { clinic_name: string })?.clinic_name}</TableCell>
                       <TableCell className="text-sm">{formatDate(inv.due_date)}</TableCell>

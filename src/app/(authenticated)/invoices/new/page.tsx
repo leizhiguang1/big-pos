@@ -1,6 +1,7 @@
+'use client'
+
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -23,8 +24,8 @@ interface LineItem {
 }
 
 export default function InvoiceCreatePage() {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -110,13 +111,13 @@ export default function InvoiceCreatePage() {
       }))
 
     await supabase.from('invoice_items').insert(itemsPayload)
-    navigate(`/invoices/${invData.id}`)
+    router.push(`/invoices/${invData.id}`)
   }
 
   return (
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -252,7 +253,7 @@ export default function InvoiceCreatePage() {
         <Button variant="outline" onClick={() => handleSave('draft')} disabled={saving}>
           Save as Draft
         </Button>
-        <Button variant="ghost" onClick={() => navigate(-1)} disabled={saving}>Cancel</Button>
+        <Button variant="ghost" onClick={() => router.back()} disabled={saving}>Cancel</Button>
       </div>
     </div>
   )

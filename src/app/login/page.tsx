@@ -1,5 +1,7 @@
+'use client'
+
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { COMPANY } from '@/lib/config'
 
 export default function LoginPage() {
-  const navigate = useNavigate()
+  const router = useRouter()
   const [username, setUsername] = useState('')
   const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
@@ -31,7 +33,8 @@ export default function LoginPage() {
       setError('Invalid username or PIN. Please try again.')
       setLoading(false)
     } else {
-      navigate('/dashboard')
+      router.push('/dashboard')
+      router.refresh()
     }
   }
 

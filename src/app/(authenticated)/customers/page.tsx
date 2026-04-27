@@ -1,5 +1,8 @@
+'use client'
+
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +13,7 @@ import { Plus, Search } from 'lucide-react'
 import type { Customer } from '@/lib/database.types'
 
 export default function CustomersPage() {
-  const navigate = useNavigate()
+  const router = useRouter()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [filtered, setFiltered] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
@@ -47,7 +50,7 @@ export default function CustomersPage() {
           <p className="text-sm text-gray-500 mt-0.5">{customers.length} registered</p>
         </div>
         <Button asChild>
-          <Link to="/customers/new"><Plus className="h-4 w-4 mr-2" />New Customer</Link>
+          <Link href="/customers/new"><Plus className="h-4 w-4 mr-2" />New Customer</Link>
         </Button>
       </div>
 
@@ -84,7 +87,7 @@ export default function CustomersPage() {
                 <TableRow
                   key={c.id}
                   className="cursor-pointer"
-                  onClick={() => navigate(`/customers/${c.id}`)}
+                  onClick={() => router.push(`/customers/${c.id}`)}
                 >
                   <TableCell className="font-medium text-gray-900">{c.clinic_name}</TableCell>
                   <TableCell className="text-gray-600">{c.contact_person ?? '—'}</TableCell>

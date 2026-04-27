@@ -1,5 +1,7 @@
+'use client'
+
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -22,10 +24,9 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
-export default function CustomerFormPage() {
-  const navigate = useNavigate()
-  const { id } = useParams()
-  const isEdit = Boolean(id)
+export default function CustomerForm({ customerId }: { customerId?: string }) {
+  const router = useRouter()
+  const isEdit = Boolean(customerId)
   const [saving, setSaving] = useState(false)
   const [serverError, setServerError] = useState('')
 
@@ -34,12 +35,12 @@ export default function CustomerFormPage() {
   })
 
   useEffect(() => {
-    if (isEdit && id) {
-      supabase.from('customers').select('*').eq('id', id).single().then(({ data }) => {
+    if (isEdit && customerId) {
+      supabase.from('customers').select('*').eq('id', customerId).single().then(({ data }) => {
         if (data) reset(data)
       })
     }
-  }, [id, isEdit, reset])
+  }, [customerId, isEdit, reset])
 
   const onSubmit = async (data: FormData) => {
     setSaving(true)
@@ -55,21 +56,21 @@ export default function CustomerFormPage() {
     }
 
     const { error } = isEdit
-      ? await supabase.from('customers').update(payload).eq('id', id!)
+      ? await supabase.from('customers').update(payload).eq('id', customerId!)
       : await supabase.from('customers').insert(payload)
 
     if (error) {
       setServerError(error.message)
       setSaving(false)
     } else {
-      navigate('/customers')
+      router.push('/customers')
     }
   }
 
   return (
     <div className="max-w-xl space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -137,7 +138,7 @@ export default function CustomerFormPage() {
               <Button type="submit" disabled={saving}>
                 {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Customer'}
               </Button>
-              <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
             </div>
           </form>
         </CardContent>
