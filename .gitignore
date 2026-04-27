@@ -15,6 +15,7 @@ node_modules
 out
 build
 *.local
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
