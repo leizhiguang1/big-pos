@@ -60,14 +60,26 @@ export interface Payment {
   created_at: string
 }
 
+type CustomerInsert = Omit<Customer, 'id' | 'created_at'>
+type ProductInsert = Omit<Product, 'id' | 'created_at'>
+type InvoiceInsert = Omit<Invoice, 'id' | 'created_at' | 'customers' | 'invoice_items' | 'payments'>
+type InvoiceItemInsert = Omit<InvoiceItem, 'id'>
+type PaymentInsert = Omit<Payment, 'id' | 'created_at'>
+
 export type Database = {
   public: {
     Tables: {
-      customers: { Row: Customer; Insert: Omit<Customer, 'id' | 'created_at'>; Update: Partial<Omit<Customer, 'id' | 'created_at'>> }
-      products: { Row: Product; Insert: Omit<Product, 'id' | 'created_at'>; Update: Partial<Omit<Product, 'id' | 'created_at'>> }
-      invoices: { Row: Invoice; Insert: Omit<Invoice, 'id' | 'created_at' | 'customers' | 'invoice_items' | 'payments'>; Update: Partial<Omit<Invoice, 'id' | 'created_at' | 'customers' | 'invoice_items' | 'payments'>> }
-      invoice_items: { Row: InvoiceItem; Insert: Omit<InvoiceItem, 'id'>; Update: Partial<Omit<InvoiceItem, 'id'>> }
-      payments: { Row: Payment; Insert: Omit<Payment, 'id' | 'created_at'>; Update: Partial<Omit<Payment, 'id' | 'created_at'>> }
+      customers:     { Row: Customer;    Insert: CustomerInsert;    Update: Partial<CustomerInsert>;    Relationships: [] }
+      products:      { Row: Product;     Insert: ProductInsert;     Update: Partial<ProductInsert>;     Relationships: [] }
+      invoices:      { Row: Invoice;     Insert: InvoiceInsert;     Update: Partial<InvoiceInsert>;     Relationships: [] }
+      invoice_items: { Row: InvoiceItem; Insert: InvoiceItemInsert; Update: Partial<InvoiceItemInsert>; Relationships: [] }
+      payments:      { Row: Payment;     Insert: PaymentInsert;     Update: Partial<PaymentInsert>;     Relationships: [] }
     }
+    Views: Record<string, never>
+    Functions: {
+      generate_invoice_number: { Args: Record<string, never>; Returns: string }
+    }
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }
