@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, Package, BarChart3,
-  LogOut, Menu, X, ChevronRight,
+  Wrench, LogOut, Menu, X, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -17,6 +17,7 @@ const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/customers', icon: Users, label: 'Customers' },
   { href: '/invoices', icon: FileText, label: 'Invoices' },
+  { href: '/work', icon: Wrench, label: 'Work' },
   { href: '/products', icon: Package, label: 'Products' },
   { href: '/reports', icon: BarChart3, label: 'Reports' },
 ]

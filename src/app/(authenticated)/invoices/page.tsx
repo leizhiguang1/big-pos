@@ -12,28 +12,39 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Plus, Search } from 'lucide-react'
-import type { Invoice } from '@/lib/database.types'
+import type { Invoice, WorkStatus } from '@/lib/database.types'
+import {
+  WORK_STATUSES,
+  WORK_STATUS_LABELS,
+  dominantWorkStatus,
+} from '@/lib/work-status'
+import { WorkStatusBadge } from '@/components/work-status-badge'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
   draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive', void: 'secondary',
 }
 
+type InvoiceWithItems = Invoice & {
+  invoice_items?: Array<{ work_status: WorkStatus }>
+}
+
 export default function InvoicesPage() {
   const router = useRouter()
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [filtered, setFiltered] = useState<Invoice[]>([])
+  const [invoices, setInvoices] = useState<InvoiceWithItems[]>([])
+  const [filtered, setFiltered] = useState<InvoiceWithItems[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [workFilter, setWorkFilter] = useState<'all' | WorkStatus>('all')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     supabase
       .from('invoices')
-      .select('*, customers(clinic_name)')
+      .select('*, customers(clinic_name), invoice_items(work_status)')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
-        setInvoices((data ?? []) as Invoice[])
-        setFiltered((data ?? []) as Invoice[])
+        setInvoices((data ?? []) as InvoiceWithItems[])
+        setFiltered((data ?? []) as InvoiceWithItems[])
         setLoading(false)
       })
   }, [])
@@ -46,10 +57,13 @@ export default function InvoicesPage() {
           inv.invoice_number.toLowerCase().includes(q) ||
           ((inv.customers as { clinic_name: string })?.clinic_name ?? '').toLowerCase().includes(q)
         const matchStatus = statusFilter === 'all' || inv.status === statusFilter
-        return matchSearch && matchStatus
+        const matchWork =
+          workFilter === 'all' ||
+          (inv.invoice_items ?? []).some(it => it.work_status === workFilter)
+        return matchSearch && matchStatus && matchWork
       })
     )
-  }, [search, statusFilter, invoices])
+  }, [search, statusFilter, workFilter, invoices])
 
   return (
     <div className="space-y-6">
@@ -73,13 +87,24 @@ export default function InvoicesPage() {
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="all">All payment</SelectItem>
             <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="sent">Sent</SelectItem>
             <SelectItem value="partial">Partial</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
             <SelectItem value="overdue">Overdue</SelectItem>
             <SelectItem value="void">Void</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={workFilter} onValueChange={v => setWorkFilter(v as 'all' | WorkStatus)}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All work" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All work</SelectItem>
+            {WORK_STATUSES.map(s => (
+              <SelectItem key={s} value={s}>{WORK_STATUS_LABELS[s]}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -94,24 +119,35 @@ export default function InvoicesPage() {
                 <TableHead>Date</TableHead>
                 <TableHead>Due Date</TableHead>
                 <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead>Work</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
-              {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">No invoices found</TableCell></TableRow>}
-              {filtered.map(inv => (
-                <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
-                  <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
-                  <TableCell className="text-gray-700">{(inv.customers as { clinic_name: string })?.clinic_name ?? '—'}</TableCell>
-                  <TableCell className="text-gray-500 text-sm">{formatDate(inv.invoice_date)}</TableCell>
-                  <TableCell className="text-gray-500 text-sm">{formatDate(inv.due_date)}</TableCell>
-                  <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {loading && <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
+              {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-400">No invoices found</TableCell></TableRow>}
+              {filtered.map(inv => {
+                const dominant = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
+                return (
+                  <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
+                    <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
+                    <TableCell className="text-gray-700">{(inv.customers as { clinic_name: string })?.clinic_name ?? '—'}</TableCell>
+                    <TableCell className="text-gray-500 text-sm">{formatDate(inv.invoice_date)}</TableCell>
+                    <TableCell className="text-gray-500 text-sm">{formatDate(inv.due_date)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
+                    <TableCell>
+                      <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {dominant ? (
+                        <WorkStatusBadge status={dominant} />
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </CardContent>

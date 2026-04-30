@@ -16,11 +16,15 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban } from 'lucide-react'
-import type { Invoice, InvoiceItem, Payment, Customer } from '@/lib/database.types'
+import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight } from 'lucide-react'
+import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStatus } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
+import { cn } from '@/lib/utils'
+import { WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_COLORS } from '@/lib/work-status'
+import { WorkStatusBadge } from '@/components/work-status-badge'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
   draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive', void: 'secondary',
@@ -44,6 +48,8 @@ export default function InvoiceDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [items, setItems] = useState<InvoiceItem[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
+  const [history, setHistory] = useState<InvoiceItemStatusHistory[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [savingPayment, setSavingPayment] = useState(false)
@@ -60,16 +66,32 @@ export default function InvoiceDetailPage() {
     if (!id) return
     const [invRes, itemsRes, paymentsRes] = await Promise.all([
       supabase.from('invoices').select('*, customers(*)').eq('id', id).single(),
-      supabase.from('invoice_items').select('*').eq('invoice_id', id),
+      supabase.from('invoice_items').select('*').eq('invoice_id', id).order('id'),
       supabase.from('payments').select('*').eq('invoice_id', id).order('payment_date'),
     ])
     if (invRes.data) {
       setInvoice(invRes.data as Invoice)
       setCustomer((invRes.data as Invoice & { customers: Customer }).customers ?? null)
     }
-    setItems(itemsRes.data ?? [])
+    const itemRows = itemsRes.data ?? []
+    setItems(itemRows)
     setPayments(paymentsRes.data ?? [])
+    if (itemRows.length > 0) {
+      const { data: histRows } = await supabase
+        .from('invoice_item_status_history')
+        .select('*')
+        .in('invoice_item_id', itemRows.map(i => i.id))
+        .order('changed_at', { ascending: false })
+      setHistory(histRows ?? [])
+    } else {
+      setHistory([])
+    }
     setLoading(false)
+  }
+
+  const updateWorkStatus = async (itemId: string, status: WorkStatus) => {
+    await supabase.from('invoice_items').update({ work_status: status }).eq('id', itemId)
+    load()
   }
 
   useEffect(() => { load() }, [id])
@@ -279,6 +301,101 @@ export default function InvoiceDetailPage() {
           <p className="text-xs text-primary/60 mt-3 italic">{BANK.paymentNote}</p>
         </div>
       </div>
+
+      {/* Work status — hidden on print */}
+      {invoice.status !== 'void' && items.length > 0 && (
+        <Card className="print:hidden">
+          <CardHeader>
+            <CardTitle className="text-base">Work Status</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead className="w-44">Status</TableHead>
+                  <TableHead className="w-44 text-right">Updated</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map(item => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.description}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={item.work_status}
+                        onValueChange={v => updateWorkStatus(item.id, v as WorkStatus)}
+                      >
+                        <SelectTrigger
+                          className={cn(
+                            'h-8 w-36 text-xs font-medium border-transparent',
+                            WORK_STATUS_COLORS[item.work_status]
+                          )}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WORK_STATUSES.map(s => (
+                            <SelectItem key={s} value={s}>{WORK_STATUS_LABELS[s]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-gray-500">
+                      {formatDate(item.work_status_updated_at)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {history.length > 0 && (
+              <div className="border-t">
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen(o => !o)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  <span>Work history ({history.length} change{history.length === 1 ? '' : 's'})</span>
+                  <ChevronRight className={`h-4 w-4 transition-transform ${historyOpen ? 'rotate-90' : ''}`} />
+                </button>
+                {historyOpen && (
+                  <div className="px-4 pb-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>When</TableHead>
+                          <TableHead>Item</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>By</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {history.map(h => {
+                          const item = items.find(i => i.id === h.invoice_item_id)
+                          return (
+                            <TableRow key={h.id}>
+                              <TableCell className="text-xs text-gray-500 whitespace-nowrap">
+                                {new Date(h.changed_at).toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-sm">{item?.description ?? '—'}</TableCell>
+                              <TableCell>
+                                <WorkStatusBadge status={h.status} />
+                              </TableCell>
+                              <TableCell className="text-sm text-gray-600">
+                                {h.changed_by_name ?? '—'}
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Payment history — hidden on print */}
       {payments.length > 0 && (
