@@ -12,13 +12,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Plus, Search } from 'lucide-react'
-import type { Invoice, WorkStatus } from '@/lib/database.types'
+import type { Invoice, WorkStatus, ServiceStatus } from '@/lib/database.types'
 import {
   WORK_STATUSES,
   WORK_STATUS_LABELS,
   dominantWorkStatus,
 } from '@/lib/work-status'
 import { WorkStatusBadge } from '@/components/work-status-badge'
+import { DEFAULT_COLOR } from '@/lib/service-status'
+import { cn } from '@/lib/utils'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
   draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive', void: 'secondary',
@@ -26,6 +28,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warn
 
 type InvoiceWithItems = Invoice & {
   invoice_items?: Array<{ work_status: WorkStatus }>
+  service_statuses?: ServiceStatus | null
 }
 
 export default function InvoicesPage() {
@@ -40,7 +43,7 @@ export default function InvoicesPage() {
   useEffect(() => {
     supabase
       .from('invoices')
-      .select('*, customers(clinic_name), invoice_items(work_status)')
+      .select('*, customers(clinic_name), invoice_items(work_status), service_statuses(*)')
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setInvoices((data ?? []) as InvoiceWithItems[])
@@ -121,13 +124,15 @@ export default function InvoicesPage() {
                 <TableHead>Amount</TableHead>
                 <TableHead>Payment</TableHead>
                 <TableHead>Work</TableHead>
+                <TableHead>Service</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
-              {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-400">No invoices found</TableCell></TableRow>}
+              {loading && <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
+              {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-400">No invoices found</TableCell></TableRow>}
               {filtered.map(inv => {
                 const dominant = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
+                const service = inv.service_statuses
                 return (
                   <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
                     <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
@@ -141,6 +146,15 @@ export default function InvoicesPage() {
                     <TableCell>
                       {dominant ? (
                         <WorkStatusBadge status={dominant} />
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {service ? (
+                        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', service.color ?? DEFAULT_COLOR)}>
+                          {service.label}
+                        </span>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
                       )}

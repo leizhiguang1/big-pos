@@ -20,11 +20,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight } from 'lucide-react'
-import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStatus } from '@/lib/database.types'
+import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStatus, ServiceStatus } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
 import { cn } from '@/lib/utils'
 import { WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_COLORS } from '@/lib/work-status'
 import { WorkStatusBadge } from '@/components/work-status-badge'
+import { fetchActiveServiceStatuses, DEFAULT_COLOR } from '@/lib/service-status'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
   draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive', void: 'secondary',
@@ -48,6 +49,9 @@ export default function InvoiceDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [patient, setPatient] = useState('')
   const [doctor, setDoctor] = useState('')
+  const [serviceStatuses, setServiceStatuses] = useState<ServiceStatus[]>([])
+  const [serviceStatusId, setServiceStatusId] = useState<string | null>(null)
+  const [serviceStatusRemark, setServiceStatusRemark] = useState('')
   const [items, setItems] = useState<InvoiceItem[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [history, setHistory] = useState<InvoiceItemStatusHistory[]>([])
@@ -66,10 +70,11 @@ export default function InvoiceDetailPage() {
 
   const load = async () => {
     if (!id) return
-    const [invRes, itemsRes, paymentsRes] = await Promise.all([
-      supabase.from('invoices').select('*, customers(*)').eq('id', id).single(),
+    const [invRes, itemsRes, paymentsRes, ssRes] = await Promise.all([
+      supabase.from('invoices').select('*, customers(*), service_statuses(*)').eq('id', id).single(),
       supabase.from('invoice_items').select('*').eq('invoice_id', id).order('id'),
       supabase.from('payments').select('*').eq('invoice_id', id).order('payment_date'),
+      fetchActiveServiceStatuses(),
     ])
     if (invRes.data) {
       const inv = invRes.data as Invoice
@@ -77,7 +82,10 @@ export default function InvoiceDetailPage() {
       setCustomer((invRes.data as Invoice & { customers: Customer }).customers ?? null)
       setPatient(inv.patient ?? '')
       setDoctor(inv.doctor ?? '')
+      setServiceStatusId(inv.service_status_id)
+      setServiceStatusRemark(inv.service_status_remark ?? '')
     }
+    setServiceStatuses(ssRes)
     const itemRows = itemsRes.data ?? []
     setItems(itemRows)
     setPayments(paymentsRes.data ?? [])
@@ -106,6 +114,24 @@ export default function InvoiceDetailPage() {
     await supabase.from('invoices').update(next).eq('id', invoice.id)
     setInvoice({ ...invoice, ...next })
   }
+
+  const updateServiceStatus = async (nextId: string | null) => {
+    if (!invoice) return
+    setServiceStatusId(nextId)
+    await supabase.from('invoices').update({ service_status_id: nextId }).eq('id', invoice.id)
+    load()
+  }
+
+  const saveServiceStatusRemark = async () => {
+    if (!invoice) return
+    const next = serviceStatusRemark || null
+    if (next === invoice.service_status_remark) return
+    await supabase.from('invoices').update({ service_status_remark: next }).eq('id', invoice.id)
+    setInvoice({ ...invoice, service_status_remark: next })
+  }
+
+  const currentServiceStatus = serviceStatuses.find(s => s.id === serviceStatusId)
+    ?? (invoice?.service_statuses ?? null)
 
   useEffect(() => { load() }, [id])
 
@@ -255,7 +281,7 @@ export default function InvoiceDetailPage() {
               </div>
             )}
           </div>
-          {(invoice.patient || invoice.doctor) && (
+          {(invoice.patient || invoice.doctor || currentServiceStatus) && (
             <div className="min-w-[160px] text-right">
               <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Case Details</div>
               {invoice.patient && (
@@ -268,6 +294,19 @@ export default function InvoiceDetailPage() {
                 <div className="text-sm">
                   <span className="text-gray-400">Doctor: </span>
                   <span className="font-medium text-gray-900">{invoice.doctor}</span>
+                </div>
+              )}
+              {currentServiceStatus && (
+                <div className="text-sm mt-1">
+                  <span className="text-gray-400">Service Status: </span>
+                  <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', currentServiceStatus.color ?? DEFAULT_COLOR)}>
+                    {currentServiceStatus.label}
+                  </span>
+                </div>
+              )}
+              {invoice.service_status_remark && (
+                <div className="text-xs text-gray-500 mt-1 italic max-w-[240px] ml-auto">
+                  {invoice.service_status_remark}
                 </div>
               )}
             </div>
@@ -356,6 +395,59 @@ export default function InvoiceDetailPage() {
                   value={doctor}
                   onChange={e => setDoctor(e.target.value)}
                   onBlur={savePatientDoctor}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Service status — what the lab is telling the doctor (Try in / Redo / …) */}
+      {invoice.status !== 'void' && (
+        <Card className="print:hidden">
+          <CardHeader>
+            <CardTitle className="text-base">Service Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={serviceStatusId ?? '__none__'}
+                  onValueChange={v => updateServiceStatus(v === '__none__' ? null : v)}
+                >
+                  <SelectTrigger
+                    className={cn(
+                      'h-9 w-56 text-sm font-medium',
+                      currentServiceStatus ? cn('border-transparent', currentServiceStatus.color ?? DEFAULT_COLOR) : '',
+                    )}
+                  >
+                    <SelectValue placeholder="No status set" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No status</SelectItem>
+                    {serviceStatuses.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {serviceStatuses.length === 0 && (
+                  <p className="text-xs text-gray-500">
+                    No statuses configured.{' '}
+                    <Link href="/settings/service-statuses" className="text-primary hover:underline">
+                      Add some in Settings
+                    </Link>.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Remark (optional)</Label>
+                <Textarea
+                  rows={2}
+                  placeholder="e.g. Check shade A2 at try-in"
+                  value={serviceStatusRemark}
+                  onChange={e => setServiceStatusRemark(e.target.value)}
+                  onBlur={saveServiceStatusRemark}
                 />
               </div>
             </div>

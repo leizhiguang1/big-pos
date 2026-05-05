@@ -24,6 +24,15 @@ export interface Product {
   created_at: string
 }
 
+export interface ServiceStatus {
+  id: string
+  label: string
+  color: string | null
+  sort_order: number
+  is_active: boolean
+  created_at: string
+}
+
 export interface Invoice {
   id: string
   invoice_number: string
@@ -35,12 +44,15 @@ export interface Invoice {
   notes: string | null
   patient: string | null
   doctor: string | null
+  service_status_id: string | null
+  service_status_remark: string | null
   subtotal: number
   total: number
   created_at: string
   customers?: Customer
   invoice_items?: InvoiceItem[]
   payments?: Payment[]
+  service_statuses?: ServiceStatus | null
 }
 
 export interface InvoiceItem {
@@ -79,11 +91,12 @@ export interface Payment {
 
 type CustomerInsert = Omit<Customer, 'id' | 'created_at'>
 type ProductInsert = Omit<Product, 'id' | 'created_at'>
-type InvoiceInsert = Omit<Invoice, 'id' | 'created_at' | 'customers' | 'invoice_items' | 'payments'>
+type InvoiceInsert = Omit<Invoice, 'id' | 'created_at' | 'customers' | 'invoice_items' | 'payments' | 'service_statuses'>
 type InvoiceItemInsert = Omit<InvoiceItem, 'id' | 'work_status' | 'work_status_updated_at' | 'work_note'> &
   Partial<Pick<InvoiceItem, 'work_status' | 'work_note'>>
 type PaymentInsert = Omit<Payment, 'id' | 'created_at'>
 type StatusHistoryInsert = Omit<InvoiceItemStatusHistory, 'id' | 'changed_at'>
+type ServiceStatusInsert = Omit<ServiceStatus, 'id' | 'created_at'>
 
 export type Database = {
   public: {
@@ -94,6 +107,7 @@ export type Database = {
       invoice_items:                { Row: InvoiceItem;                Insert: InvoiceItemInsert;    Update: Partial<InvoiceItemInsert>;    Relationships: [] }
       invoice_item_status_history:  { Row: InvoiceItemStatusHistory;   Insert: StatusHistoryInsert;  Update: Partial<StatusHistoryInsert>;  Relationships: [] }
       payments:                     { Row: Payment;                    Insert: PaymentInsert;        Update: Partial<PaymentInsert>;        Relationships: [] }
+      service_statuses:             { Row: ServiceStatus;              Insert: ServiceStatusInsert;  Update: Partial<ServiceStatusInsert>;  Relationships: [] }
     }
     Views: Record<string, never>
     Functions: {
