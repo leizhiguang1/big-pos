@@ -51,7 +51,6 @@ export default function InvoiceDetailPage() {
   const [doctor, setDoctor] = useState('')
   const [serviceStatuses, setServiceStatuses] = useState<ServiceStatus[]>([])
   const [serviceStatusId, setServiceStatusId] = useState<string | null>(null)
-  const [serviceStatusRemark, setServiceStatusRemark] = useState('')
   const [items, setItems] = useState<InvoiceItem[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [history, setHistory] = useState<InvoiceItemStatusHistory[]>([])
@@ -83,7 +82,6 @@ export default function InvoiceDetailPage() {
       setPatient(inv.patient ?? '')
       setDoctor(inv.doctor ?? '')
       setServiceStatusId(inv.service_status_id)
-      setServiceStatusRemark(inv.service_status_remark ?? '')
     }
     setServiceStatuses(ssRes)
     const itemRows = itemsRes.data ?? []
@@ -120,14 +118,6 @@ export default function InvoiceDetailPage() {
     setServiceStatusId(nextId)
     await supabase.from('invoices').update({ service_status_id: nextId }).eq('id', invoice.id)
     load()
-  }
-
-  const saveServiceStatusRemark = async () => {
-    if (!invoice) return
-    const next = serviceStatusRemark || null
-    if (next === invoice.service_status_remark) return
-    await supabase.from('invoices').update({ service_status_remark: next }).eq('id', invoice.id)
-    setInvoice({ ...invoice, service_status_remark: next })
   }
 
   const currentServiceStatus = serviceStatuses.find(s => s.id === serviceStatusId)
@@ -304,11 +294,6 @@ export default function InvoiceDetailPage() {
                   </span>
                 </div>
               )}
-              {invoice.service_status_remark && (
-                <div className="text-xs text-gray-500 mt-1 italic max-w-[240px] ml-auto">
-                  {invoice.service_status_remark}
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -439,16 +424,6 @@ export default function InvoiceDetailPage() {
                     </Link>.
                   </p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label>Remark (optional)</Label>
-                <Textarea
-                  rows={2}
-                  placeholder="e.g. Check shade A2 at try-in"
-                  value={serviceStatusRemark}
-                  onChange={e => setServiceStatusRemark(e.target.value)}
-                  onBlur={saveServiceStatusRemark}
-                />
               </div>
             </div>
           </CardContent>

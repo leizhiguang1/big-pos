@@ -11,10 +11,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
-import type { Customer, Product } from '@/lib/database.types'
+import type { Customer, Product, ServiceStatus } from '@/lib/database.types'
 import { addDays, format } from 'date-fns'
+import { fetchActiveServiceStatuses, DEFAULT_COLOR } from '@/lib/service-status'
 
 interface LineItem {
   product_id: string | null
@@ -30,12 +31,14 @@ export default function InvoiceCreatePage() {
 
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [serviceStatuses, setServiceStatuses] = useState<ServiceStatus[]>([])
   const [customerId, setCustomerId] = useState(searchParams.get('customer') ?? '')
   const [invoiceDate, setInvoiceDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [dueDate, setDueDate] = useState(format(addDays(new Date(), 30), 'yyyy-MM-dd'))
   const [notes, setNotes] = useState('')
   const [patient, setPatient] = useState('')
   const [doctor, setDoctor] = useState('')
+  const [serviceStatusId, setServiceStatusId] = useState<string | null>(null)
   const [items, setItems] = useState<LineItem[]>([{ product_id: null, description: '', quantity: 1, unit_price: 0 }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -44,11 +47,15 @@ export default function InvoiceCreatePage() {
     Promise.all([
       supabase.from('customers').select('*').order('clinic_name'),
       supabase.from('products').select('*').eq('active', true).order('name'),
-    ]).then(([cRes, pRes]) => {
+      fetchActiveServiceStatuses(),
+    ]).then(([cRes, pRes, ssList]) => {
       setCustomers(cRes.data ?? [])
       setProducts(pRes.data ?? [])
+      setServiceStatuses(ssList)
     })
   }, [])
+
+  const currentServiceStatus = serviceStatuses.find(s => s.id === serviceStatusId) ?? null
 
   const updateItem = useCallback((index: number, field: keyof LineItem, value: string | number) => {
     setItems(prev => {
@@ -90,6 +97,7 @@ export default function InvoiceCreatePage() {
         notes: notes || null,
         patient: patient || null,
         doctor: doctor || null,
+        service_status_id: serviceStatusId,
         subtotal,
         total: subtotal,
       })
@@ -171,6 +179,29 @@ export default function InvoiceCreatePage() {
               <Label>Doctor</Label>
               <Input placeholder="Doctor name" value={doctor} onChange={e => setDoctor(e.target.value)} />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Service Status</Label>
+            <Select
+              value={serviceStatusId ?? '__none__'}
+              onValueChange={v => setServiceStatusId(v === '__none__' ? null : v)}
+            >
+              <SelectTrigger
+                className={cn(
+                  'h-9 w-56 text-sm font-medium',
+                  currentServiceStatus ? cn('border-transparent', currentServiceStatus.color ?? DEFAULT_COLOR) : '',
+                )}
+              >
+                <SelectValue placeholder="No status set" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">No status</SelectItem>
+                {serviceStatuses.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

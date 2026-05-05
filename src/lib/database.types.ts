@@ -45,7 +45,6 @@ export interface Invoice {
   patient: string | null
   doctor: string | null
   service_status_id: string | null
-  service_status_remark: string | null
   subtotal: number
   total: number
   created_at: string
