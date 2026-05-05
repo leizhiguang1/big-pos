@@ -40,9 +40,34 @@
 
 @media print {
   @page {
-    size: A5;
-    margin: 12mm;
+    size: A4;
+    margin: 16mm;
   }
+
+  /* Force background colors / badges / colored panels to actually print.
+     Without this, browsers strip every bg-* fill (notes box, bank panel,
+     status pills) so the page comes out flat and washed-out. */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* The app shell uses h-screen + overflow-hidden + an inner overflow-y-auto
+     <main>. That combination clips print output to a single viewport — only
+     the visible portion of the invoice prints. Reset these so the page
+     flows naturally and multi-page invoices render in full. */
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body * {
+    overflow: visible !important;
+  }
+  .h-screen {
+    height: auto !important;
+  }
+
   .print\:hidden {
     display: none !important;
   }

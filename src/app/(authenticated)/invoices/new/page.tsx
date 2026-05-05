@@ -82,7 +82,6 @@ export default function InvoiceCreatePage() {
     const { data: invData, error: invError } = await supabase
       .from('invoices')
       .insert({
-        invoice_number: (await supabase.rpc('generate_invoice_number')).data as string,
         customer_id: customerId,
         created_by: user!.id,
         invoice_date: invoiceDate,
@@ -114,7 +113,12 @@ export default function InvoiceCreatePage() {
         amount: i.quantity * i.unit_price,
       }))
 
-    await supabase.from('invoice_items').insert(itemsPayload)
+    const { error: itemsError } = await supabase.from('invoice_items').insert(itemsPayload)
+    if (itemsError) {
+      setError(itemsError.message)
+      setSaving(false)
+      return
+    }
     router.push(`/invoices/${invData.id}`)
   }
 
