@@ -15,6 +15,7 @@ import { ArrowLeft } from 'lucide-react'
 
 const schema = z.object({
   clinic_name: z.string().min(1, 'Clinic name is required'),
+  ssm_no: z.string().optional(),
   contact_person: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
@@ -47,6 +48,7 @@ export default function CustomerForm({ customerId }: { customerId?: string }) {
     setServerError('')
     const payload = {
       clinic_name: data.clinic_name,
+      ssm_no: data.ssm_no || null,
       contact_person: data.contact_person || null,
       phone: data.phone || null,
       email: data.email || null,
@@ -83,10 +85,16 @@ export default function CustomerForm({ customerId }: { customerId?: string }) {
         <CardHeader><CardTitle className="text-base">Customer Information</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="clinic_name">Clinic / Business Name *</Label>
-              <Input id="clinic_name" placeholder="e.g. Klinik Gigi Sehat" {...register('clinic_name')} />
-              {errors.clinic_name && <p className="text-xs text-destructive">{errors.clinic_name.message}</p>}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="clinic_name">Clinic / Business Name *</Label>
+                <Input id="clinic_name" placeholder="e.g. Klinik Gigi Sehat" {...register('clinic_name')} />
+                {errors.clinic_name && <p className="text-xs text-destructive">{errors.clinic_name.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ssm_no">SSM No.</Label>
+                <Input id="ssm_no" placeholder="e.g. 202301012345" {...register('ssm_no')} />
+              </div>
             </div>
 
             <div className="space-y-2">

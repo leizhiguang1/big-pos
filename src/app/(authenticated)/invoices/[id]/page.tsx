@@ -46,6 +46,8 @@ export default function InvoiceDetailPage() {
 
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [customer, setCustomer] = useState<Customer | null>(null)
+  const [patient, setPatient] = useState('')
+  const [doctor, setDoctor] = useState('')
   const [items, setItems] = useState<InvoiceItem[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [history, setHistory] = useState<InvoiceItemStatusHistory[]>([])
@@ -70,8 +72,11 @@ export default function InvoiceDetailPage() {
       supabase.from('payments').select('*').eq('invoice_id', id).order('payment_date'),
     ])
     if (invRes.data) {
-      setInvoice(invRes.data as Invoice)
+      const inv = invRes.data as Invoice
+      setInvoice(inv)
       setCustomer((invRes.data as Invoice & { customers: Customer }).customers ?? null)
+      setPatient(inv.patient ?? '')
+      setDoctor(inv.doctor ?? '')
     }
     const itemRows = itemsRes.data ?? []
     setItems(itemRows)
@@ -92,6 +97,14 @@ export default function InvoiceDetailPage() {
   const updateWorkStatus = async (itemId: string, status: WorkStatus) => {
     await supabase.from('invoice_items').update({ work_status: status }).eq('id', itemId)
     load()
+  }
+
+  const savePatientDoctor = async () => {
+    if (!invoice) return
+    const next = { patient: patient || null, doctor: doctor || null }
+    if (next.patient === invoice.patient && next.doctor === invoice.doctor) return
+    await supabase.from('invoices').update(next).eq('id', invoice.id)
+    setInvoice({ ...invoice, ...next })
   }
 
   useEffect(() => { load() }, [id])
@@ -223,21 +236,40 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
 
-        {/* Bill To / Deliver To */}
-        <div className={`mb-8 grid gap-6 ${customer?.delivery_address ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Bill To</div>
-            <div className="font-semibold text-gray-900">{customer?.clinic_name}</div>
-            {customer?.contact_person && <div className="text-sm text-gray-600">{customer.contact_person}</div>}
-            {customer?.billing_address && <div className="text-sm text-gray-500 whitespace-pre-line">{customer.billing_address}</div>}
-            {customer?.phone && <div className="text-sm text-gray-500">Tel: {customer.phone}</div>}
-          </div>
-          {customer?.delivery_address && (
+        {/* Bill To / Deliver To + Case Details */}
+        <div className="mb-8 flex flex-wrap gap-6 justify-between">
+          <div className={`grid gap-6 flex-1 ${customer?.delivery_address ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Deliver To</div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Bill To</div>
               <div className="font-semibold text-gray-900">{customer?.clinic_name}</div>
               {customer?.contact_person && <div className="text-sm text-gray-600">{customer.contact_person}</div>}
-              <div className="text-sm text-gray-500 whitespace-pre-line">{customer.delivery_address}</div>
+              {customer?.billing_address && <div className="text-sm text-gray-500 whitespace-pre-line">{customer.billing_address}</div>}
+              {customer?.phone && <div className="text-sm text-gray-500">Tel: {customer.phone}</div>}
+            </div>
+            {customer?.delivery_address && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Deliver To</div>
+                <div className="font-semibold text-gray-900">{customer?.clinic_name}</div>
+                {customer?.contact_person && <div className="text-sm text-gray-600">{customer.contact_person}</div>}
+                <div className="text-sm text-gray-500 whitespace-pre-line">{customer.delivery_address}</div>
+              </div>
+            )}
+          </div>
+          {(invoice.patient || invoice.doctor) && (
+            <div className="min-w-[160px] text-right">
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Case Details</div>
+              {invoice.patient && (
+                <div className="text-sm">
+                  <span className="text-gray-400">Patient: </span>
+                  <span className="font-medium text-gray-900">{invoice.patient}</span>
+                </div>
+              )}
+              {invoice.doctor && (
+                <div className="text-sm">
+                  <span className="text-gray-400">Doctor: </span>
+                  <span className="font-medium text-gray-900">{invoice.doctor}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -301,6 +333,35 @@ export default function InvoiceDetailPage() {
           <p className="text-xs text-primary/60 mt-3 italic">{BANK.paymentNote}</p>
         </div>
       </div>
+
+      {/* Case details — editable, hidden on print */}
+      {invoice.status !== 'void' && (
+        <Card className="print:hidden">
+          <CardHeader><CardTitle className="text-base">Case Details</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Patient</Label>
+                <Input
+                  placeholder="Patient name"
+                  value={patient}
+                  onChange={e => setPatient(e.target.value)}
+                  onBlur={savePatientDoctor}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Doctor</Label>
+                <Input
+                  placeholder="Doctor name"
+                  value={doctor}
+                  onChange={e => setDoctor(e.target.value)}
+                  onBlur={savePatientDoctor}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Work status — hidden on print */}
       {invoice.status !== 'void' && items.length > 0 && (

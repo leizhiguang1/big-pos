@@ -4,6 +4,7 @@ export type WorkStatus = 'received' | 'in_progress' | 'qc' | 'ready' | 'delivere
 export interface Customer {
   id: string
   clinic_name: string
+  ssm_no: string | null
   contact_person: string | null
   phone: string | null
   email: string | null
@@ -32,6 +33,8 @@ export interface Invoice {
   due_date: string
   status: InvoiceStatus
   notes: string | null
+  patient: string | null
+  doctor: string | null
   subtotal: number
   total: number
   created_at: string

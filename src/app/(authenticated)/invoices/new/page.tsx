@@ -34,6 +34,8 @@ export default function InvoiceCreatePage() {
   const [invoiceDate, setInvoiceDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [dueDate, setDueDate] = useState(format(addDays(new Date(), 30), 'yyyy-MM-dd'))
   const [notes, setNotes] = useState('')
+  const [patient, setPatient] = useState('')
+  const [doctor, setDoctor] = useState('')
   const [items, setItems] = useState<LineItem[]>([{ product_id: null, description: '', quantity: 1, unit_price: 0 }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -87,6 +89,8 @@ export default function InvoiceCreatePage() {
         due_date: dueDate,
         status,
         notes: notes || null,
+        patient: patient || null,
+        doctor: doctor || null,
         subtotal,
         total: subtotal,
       })
@@ -151,6 +155,17 @@ export default function InvoiceCreatePage() {
             <div className="space-y-2">
               <Label>Due Date</Label>
               <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Patient</Label>
+              <Input placeholder="Patient name" value={patient} onChange={e => setPatient(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Doctor</Label>
+              <Input placeholder="Doctor name" value={doctor} onChange={e => setDoctor(e.target.value)} />
             </div>
           </div>
         </CardContent>
