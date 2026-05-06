@@ -6,9 +6,12 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number): string {
+  const hasCents = Math.round(amount * 100) % 100 !== 0
   return new Intl.NumberFormat('ms-MY', {
     style: 'currency',
     currency: 'MYR',
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 

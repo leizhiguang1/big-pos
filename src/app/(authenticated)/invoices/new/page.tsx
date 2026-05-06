@@ -80,9 +80,21 @@ export default function InvoiceCreatePage() {
 
   const subtotal = items.reduce((s, item) => s + item.quantity * item.unit_price, 0)
 
+  const itemPriceErrors = items.map(item => {
+    if (!item.product_id) return null
+    const p = products.find(x => x.id === item.product_id)
+    if (!p || p.min_unit_price == null || p.max_unit_price == null) return null
+    if (item.unit_price < p.min_unit_price || item.unit_price > p.max_unit_price) {
+      return `Allowed: ${formatCurrency(p.min_unit_price)} – ${formatCurrency(p.max_unit_price)}`
+    }
+    return null
+  })
+  const hasItemPriceErrors = itemPriceErrors.some(Boolean)
+
   const handleSave = async (status: 'draft' | 'sent') => {
     if (!customerId) { setError('Please select a customer.'); return }
     if (items.every(i => !i.description)) { setError('Add at least one item.'); return }
+    if (hasItemPriceErrors) { setError('Some line items are outside the allowed price range.'); return }
     setSaving(true)
     setError('')
 
@@ -220,54 +232,69 @@ export default function InvoiceCreatePage() {
             <span className="col-span-1"></span>
           </div>
 
-          {items.map((item, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-start">
-              <Input
-                className="col-span-5"
-                placeholder="Description"
-                value={item.description}
-                onChange={e => updateItem(i, 'description', e.target.value)}
-              />
-              <Select
-                value={item.product_id ?? ''}
-                onValueChange={v => updateItem(i, 'product_id', v)}
-              >
-                <SelectTrigger className="col-span-3 text-xs">
-                  <SelectValue placeholder="Pick catalog…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                className="col-span-1 text-right"
-                type="number"
-                min="0.01"
-                step="0.01"
-                value={item.quantity}
-                onChange={e => updateItem(i, 'quantity', parseFloat(e.target.value) || 0)}
-              />
-              <Input
-                className="col-span-2 text-right"
-                type="number"
-                min="0"
-                step="0.01"
-                value={item.unit_price}
-                onChange={e => updateItem(i, 'unit_price', parseFloat(e.target.value) || 0)}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="col-span-1 h-10 w-10 text-gray-400 hover:text-red-500"
-                onClick={() => removeItem(i)}
-                disabled={items.length === 1}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+          {items.map((item, i) => {
+            const product = item.product_id ? products.find(p => p.id === item.product_id) : null
+            const hasRange = product?.min_unit_price != null && product?.max_unit_price != null
+            const priceError = itemPriceErrors[i]
+            return (
+              <div key={i} className="grid grid-cols-12 gap-2 items-start">
+                <Input
+                  className="col-span-5"
+                  placeholder="Description"
+                  value={item.description}
+                  onChange={e => updateItem(i, 'description', e.target.value)}
+                />
+                <Select
+                  value={item.product_id ?? ''}
+                  onValueChange={v => updateItem(i, 'product_id', v)}
+                >
+                  <SelectTrigger className="col-span-3 text-xs">
+                    <SelectValue placeholder="Pick catalog…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="col-span-1 text-right"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={item.quantity}
+                  onChange={e => updateItem(i, 'quantity', parseFloat(e.target.value) || 0)}
+                />
+                <div className="col-span-2 space-y-1">
+                  <Input
+                    className={cn('text-right', priceError && 'border-destructive focus-visible:ring-destructive')}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.unit_price}
+                    aria-invalid={priceError ? true : undefined}
+                    onChange={e => updateItem(i, 'unit_price', parseFloat(e.target.value) || 0)}
+                  />
+                  {priceError ? (
+                    <p className="text-xs text-destructive text-right">{priceError}</p>
+                  ) : hasRange ? (
+                    <p className="text-xs text-gray-400 text-right">
+                      {formatCurrency(product!.min_unit_price!)} – {formatCurrency(product!.max_unit_price!)}
+                    </p>
+                  ) : null}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="col-span-1 h-10 w-10 text-gray-400 hover:text-red-500"
+                  onClick={() => removeItem(i)}
+                  disabled={items.length === 1}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )
+          })}
 
           <Separator />
 
@@ -297,10 +324,10 @@ export default function InvoiceCreatePage() {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex gap-3">
-        <Button onClick={() => handleSave('sent')} disabled={saving}>
+        <Button onClick={() => handleSave('sent')} disabled={saving || hasItemPriceErrors}>
           {saving ? 'Saving…' : 'Create & Send'}
         </Button>
-        <Button variant="outline" onClick={() => handleSave('draft')} disabled={saving}>
+        <Button variant="outline" onClick={() => handleSave('draft')} disabled={saving || hasItemPriceErrors}>
           Save as Draft
         </Button>
         <Button variant="ghost" onClick={() => router.back()} disabled={saving}>Cancel</Button>

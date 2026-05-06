@@ -19,6 +19,8 @@ export interface Product {
   name: string
   description: string | null
   unit_price: number
+  min_unit_price: number | null
+  max_unit_price: number | null
   unit: string
   active: boolean
   created_at: string
