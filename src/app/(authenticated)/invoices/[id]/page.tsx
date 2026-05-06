@@ -71,7 +71,7 @@ export default function InvoiceDetailPage() {
     if (!id) return
     const [invRes, itemsRes, paymentsRes, ssRes] = await Promise.all([
       supabase.from('invoices').select('*, customers(*), service_statuses(*)').eq('id', id).single(),
-      supabase.from('invoice_items').select('*').eq('invoice_id', id).order('id'),
+      supabase.from('invoice_items').select('*').eq('invoice_id', id).order('created_at'),
       supabase.from('payments').select('*').eq('invoice_id', id).order('payment_date'),
       fetchActiveServiceStatuses(),
     ])
@@ -237,7 +237,7 @@ export default function InvoiceDetailPage() {
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
-            <div className="text-2xl font-bold text-primary mb-1">{COMPANY.name}</div>
+            <img src="/logo.png" alt={COMPANY.name} className="max-h-10 max-w-[200px] object-contain object-left mb-2" />
             <div className="text-sm text-gray-500 whitespace-pre-line">{COMPANY.address}</div>
             {COMPANY.phone && <div className="text-sm text-gray-500">Tel: {COMPANY.phone}</div>}
             {COMPANY.email && <div className="text-sm text-gray-500">{COMPANY.email}</div>}

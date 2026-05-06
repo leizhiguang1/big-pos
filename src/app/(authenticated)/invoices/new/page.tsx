@@ -46,7 +46,7 @@ export default function InvoiceCreatePage() {
   useEffect(() => {
     Promise.all([
       supabase.from('customers').select('*').order('clinic_name'),
-      supabase.from('products').select('*').eq('active', true).order('name'),
+      supabase.from('products').select('*').eq('active', true).order('created_at'),
       fetchActiveServiceStatuses(),
     ]).then(([cRes, pRes, ssList]) => {
       setCustomers(cRes.data ?? [])

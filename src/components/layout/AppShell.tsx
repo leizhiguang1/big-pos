@@ -40,10 +40,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="p-4">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg flex-shrink-0">
-            B
+            C
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">BigPOS</p>
+            <p className="text-sm font-semibold text-gray-900 truncate">Chi Dental Lab</p>
           </div>
         </div>
       </div>

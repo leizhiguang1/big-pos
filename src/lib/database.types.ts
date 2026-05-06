@@ -65,6 +65,7 @@ export interface InvoiceItem {
   work_status: WorkStatus
   work_status_updated_at: string
   work_note: string | null
+  created_at: string
 }
 
 export interface InvoiceItemStatusHistory {
@@ -92,7 +93,7 @@ type CustomerInsert = Omit<Customer, 'id' | 'created_at'>
 type ProductInsert = Omit<Product, 'id' | 'created_at'>
 type InvoiceInsert = Omit<Invoice, 'id' | 'created_at' | 'invoice_number' | 'customers' | 'invoice_items' | 'payments' | 'service_statuses'> &
   Partial<Pick<Invoice, 'invoice_number'>>
-type InvoiceItemInsert = Omit<InvoiceItem, 'id' | 'work_status' | 'work_status_updated_at' | 'work_note'> &
+type InvoiceItemInsert = Omit<InvoiceItem, 'id' | 'created_at' | 'work_status' | 'work_status_updated_at' | 'work_note'> &
   Partial<Pick<InvoiceItem, 'work_status' | 'work_note'>>
 type PaymentInsert = Omit<Payment, 'id' | 'created_at'>
 type StatusHistoryInsert = Omit<InvoiceItemStatusHistory, 'id' | 'changed_at'>
