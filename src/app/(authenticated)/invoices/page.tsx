@@ -119,6 +119,7 @@ export default function InvoicesPage() {
               <TableRow>
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Customer</TableHead>
+                <TableHead>Patient</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Due Date</TableHead>
                 <TableHead>Amount</TableHead>
@@ -128,8 +129,8 @@ export default function InvoicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
-              {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-400">No invoices found</TableCell></TableRow>}
+              {loading && <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
+              {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-400">No invoices found</TableCell></TableRow>}
               {filtered.map(inv => {
                 const dominant = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
                 const service = inv.service_statuses
@@ -137,6 +138,7 @@ export default function InvoicesPage() {
                   <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
                     <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
                     <TableCell className="text-gray-700">{(inv.customers as { clinic_name: string })?.clinic_name ?? '—'}</TableCell>
+                    <TableCell className="text-gray-700">{inv.patient ?? '—'}</TableCell>
                     <TableCell className="text-gray-500 text-sm">{formatDate(inv.invoice_date)}</TableCell>
                     <TableCell className="text-gray-500 text-sm">{formatDate(inv.due_date)}</TableCell>
                     <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
