@@ -40,9 +40,14 @@ export default function InvoiceCreatePage() {
   const [doctor, setDoctor] = useState('')
   const [serviceStatusId, setServiceStatusId] = useState<string | null>(null)
   const [items, setItems] = useState<LineItem[]>([{ product_id: null, description: '', quantity: 1, unit_price: 0 }])
+  const [billToName, setBillToName] = useState('')
+  const [billToContact, setBillToContact] = useState('')
+  const [billToPhone, setBillToPhone] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
+  const [shipToName, setShipToName] = useState('')
+  const [shipToContact, setShipToContact] = useState('')
   const [deliveryAddress, setDeliveryAddress] = useState('')
-  const [showAddress, setShowAddress] = useState(false)
+  const [showRecipient, setShowRecipient] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -50,20 +55,42 @@ export default function InvoiceCreatePage() {
 
   useEffect(() => {
     if (!selectedCustomer) {
+      setBillToName('')
+      setBillToContact('')
+      setBillToPhone('')
       setBillingAddress('')
+      setShipToName('')
+      setShipToContact('')
       setDeliveryAddress('')
       return
     }
+    setBillToName(selectedCustomer.clinic_name ?? '')
+    setBillToContact(selectedCustomer.contact_person ?? '')
+    setBillToPhone(selectedCustomer.phone ?? '')
     setBillingAddress(selectedCustomer.billing_address ?? '')
+    setShipToName(selectedCustomer.clinic_name ?? '')
+    setShipToContact(selectedCustomer.contact_person ?? '')
     setDeliveryAddress(selectedCustomer.delivery_address ?? '')
   }, [selectedCustomer])
 
-  const billingDirty = selectedCustomer ? billingAddress !== (selectedCustomer.billing_address ?? '') : false
-  const deliveryDirty = selectedCustomer ? deliveryAddress !== (selectedCustomer.delivery_address ?? '') : false
-  const addressDirty = billingDirty || deliveryDirty
+  const recipientDirty = selectedCustomer
+    ? billToName !== (selectedCustomer.clinic_name ?? '')
+      || billToContact !== (selectedCustomer.contact_person ?? '')
+      || billToPhone !== (selectedCustomer.phone ?? '')
+      || billingAddress !== (selectedCustomer.billing_address ?? '')
+      || shipToName !== (selectedCustomer.clinic_name ?? '')
+      || shipToContact !== (selectedCustomer.contact_person ?? '')
+      || deliveryAddress !== (selectedCustomer.delivery_address ?? '')
+    : false
+
   const restoreFromCustomer = () => {
     if (!selectedCustomer) return
+    setBillToName(selectedCustomer.clinic_name ?? '')
+    setBillToContact(selectedCustomer.contact_person ?? '')
+    setBillToPhone(selectedCustomer.phone ?? '')
     setBillingAddress(selectedCustomer.billing_address ?? '')
+    setShipToName(selectedCustomer.clinic_name ?? '')
+    setShipToContact(selectedCustomer.contact_person ?? '')
     setDeliveryAddress(selectedCustomer.delivery_address ?? '')
   }
 
@@ -134,7 +161,12 @@ export default function InvoiceCreatePage() {
         patient: patient || null,
         doctor: doctor || null,
         service_status_id: serviceStatusId,
+        bill_to_name: billToName.trim() || null,
+        bill_to_contact: billToContact.trim() || null,
+        bill_to_phone: billToPhone.trim() || null,
         billing_address: billingAddress.trim() || null,
+        ship_to_name: shipToName.trim() || null,
+        ship_to_contact: shipToContact.trim() || null,
         delivery_address: deliveryAddress.trim() || null,
         subtotal,
         total: subtotal,
@@ -201,45 +233,63 @@ export default function InvoiceCreatePage() {
             <div className="rounded-md border border-gray-200 bg-gray-50/50">
               <button
                 type="button"
-                onClick={() => setShowAddress(s => !s)}
+                onClick={() => setShowRecipient(s => !s)}
                 className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-100/50"
               >
                 <span className="flex items-center gap-2 text-gray-700">
-                  {showAddress ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  <span className="font-medium">Billing / delivery address</span>
-                  {addressDirty && !showAddress && (
+                  {showRecipient ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <span className="font-medium">Recipient details (Bill To / Deliver To)</span>
+                  {recipientDirty && !showRecipient && (
                     <span className="text-xs font-medium text-amber-600">Edited</span>
                   )}
                 </span>
-                {!showAddress && (
+                {!showRecipient && (
                   <span className="truncate max-w-[260px] text-xs text-gray-500">
-                    {billingAddress.split('\n')[0] || 'No billing address'}
+                    {billToName || 'No bill-to name'}
                   </span>
                 )}
               </button>
-              {showAddress && (
-                <div className="space-y-3 border-t border-gray-200 p-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Billing address</Label>
-                    <Textarea
-                      placeholder="Billing address"
-                      value={billingAddress}
-                      onChange={e => setBillingAddress(e.target.value)}
-                      rows={3}
-                    />
+              {showRecipient && (
+                <div className="border-t border-gray-200 p-3 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Bill To</div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Name</Label>
+                        <Input value={billToName} onChange={e => setBillToName(e.target.value)} placeholder="Recipient name" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Contact person</Label>
+                        <Input value={billToContact} onChange={e => setBillToContact(e.target.value)} placeholder="Optional" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Phone</Label>
+                        <Input value={billToPhone} onChange={e => setBillToPhone(e.target.value)} placeholder="Optional" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Address</Label>
+                        <Textarea value={billingAddress} onChange={e => setBillingAddress(e.target.value)} rows={3} placeholder="Billing address" />
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Deliver To</div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Name</Label>
+                        <Input value={shipToName} onChange={e => setShipToName(e.target.value)} placeholder="Recipient name" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Contact person</Label>
+                        <Input value={shipToContact} onChange={e => setShipToContact(e.target.value)} placeholder="Optional" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Address</Label>
+                        <Textarea value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} rows={6} placeholder="Delivery address (leave empty to hide Deliver To block)" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Delivery address</Label>
-                    <Textarea
-                      placeholder="Delivery address (optional)"
-                      value={deliveryAddress}
-                      onChange={e => setDeliveryAddress(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pt-1">
                     <p className="text-xs text-gray-500">Edits apply to this invoice only.</p>
-                    {addressDirty && (
+                    {recipientDirty && (
                       <Button type="button" variant="ghost" size="sm" onClick={restoreFromCustomer} className="h-7 text-xs">
                         <RotateCcw className="h-3 w-3 mr-1" />
                         Restore from customer

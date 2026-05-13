@@ -61,11 +61,16 @@ export default function InvoiceDetailPage() {
   const [markingPaid, setMarkingPaid] = useState(false)
   const [voidOpen, setVoidOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
-  const [addressOpen, setAddressOpen] = useState(false)
+  const [recipientOpen, setRecipientOpen] = useState(false)
+  const [editBillToName, setEditBillToName] = useState('')
+  const [editBillToContact, setEditBillToContact] = useState('')
+  const [editBillToPhone, setEditBillToPhone] = useState('')
   const [editBilling, setEditBilling] = useState('')
+  const [editShipToName, setEditShipToName] = useState('')
+  const [editShipToContact, setEditShipToContact] = useState('')
   const [editDelivery, setEditDelivery] = useState('')
   const [alsoSaveToCustomer, setAlsoSaveToCustomer] = useState(false)
-  const [savingAddress, setSavingAddress] = useState(false)
+  const [savingRecipient, setSavingRecipient] = useState(false)
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PaymentForm>({
     resolver: zodResolver(paymentSchema),
@@ -176,31 +181,56 @@ export default function InvoiceDetailPage() {
     load()
   }
 
-  const openAddressDialog = () => {
+  const openRecipientDialog = () => {
     if (!invoice) return
+    setEditBillToName(invoice.bill_to_name ?? '')
+    setEditBillToContact(invoice.bill_to_contact ?? '')
+    setEditBillToPhone(invoice.bill_to_phone ?? '')
     setEditBilling(invoice.billing_address ?? '')
+    setEditShipToName(invoice.ship_to_name ?? '')
+    setEditShipToContact(invoice.ship_to_contact ?? '')
     setEditDelivery(invoice.delivery_address ?? '')
     setAlsoSaveToCustomer(false)
-    setAddressOpen(true)
+    setRecipientOpen(true)
   }
 
-  const saveAddress = async () => {
+  const saveRecipient = async () => {
     if (!invoice) return
-    setSavingAddress(true)
+    setSavingRecipient(true)
+    const nextBillName = editBillToName.trim() || null
+    const nextBillContact = editBillToContact.trim() || null
+    const nextBillPhone = editBillToPhone.trim() || null
     const nextBilling = editBilling.trim() || null
+    const nextShipName = editShipToName.trim() || null
+    const nextShipContact = editShipToContact.trim() || null
     const nextDelivery = editDelivery.trim() || null
     await supabase
       .from('invoices')
-      .update({ billing_address: nextBilling, delivery_address: nextDelivery })
+      .update({
+        bill_to_name: nextBillName,
+        bill_to_contact: nextBillContact,
+        bill_to_phone: nextBillPhone,
+        billing_address: nextBilling,
+        ship_to_name: nextShipName,
+        ship_to_contact: nextShipContact,
+        delivery_address: nextDelivery,
+      })
       .eq('id', invoice.id)
     if (alsoSaveToCustomer && invoice.customer_id) {
+      const customerUpdate: Record<string, string | null> = {
+        contact_person: nextBillContact,
+        phone: nextBillPhone,
+        billing_address: nextBilling,
+        delivery_address: nextDelivery,
+      }
+      if (nextBillName) customerUpdate.clinic_name = nextBillName
       await supabase
         .from('customers')
-        .update({ billing_address: nextBilling, delivery_address: nextDelivery })
+        .update(customerUpdate)
         .eq('id', invoice.customer_id)
     }
-    setSavingAddress(false)
-    setAddressOpen(false)
+    setSavingRecipient(false)
+    setRecipientOpen(false)
     load()
   }
 
@@ -294,24 +324,24 @@ export default function InvoiceDetailPage() {
                 {invoice.status !== 'void' && (
                   <button
                     type="button"
-                    onClick={openAddressDialog}
+                    onClick={openRecipientDialog}
                     className="print:hidden text-gray-400 hover:text-primary"
-                    aria-label="Edit address"
+                    aria-label="Edit recipient"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
-              <div className="font-semibold text-gray-900">{customer?.clinic_name}</div>
-              {customer?.contact_person && <div className="text-sm text-gray-600">{customer.contact_person}</div>}
+              {invoice.bill_to_name && <div className="font-semibold text-gray-900">{invoice.bill_to_name}</div>}
+              {invoice.bill_to_contact && <div className="text-sm text-gray-600">{invoice.bill_to_contact}</div>}
               {invoice.billing_address && <div className="text-sm text-gray-500 whitespace-pre-line">{invoice.billing_address}</div>}
-              {customer?.phone && <div className="text-sm text-gray-500">Tel: {customer.phone}</div>}
+              {invoice.bill_to_phone && <div className="text-sm text-gray-500">Tel: {invoice.bill_to_phone}</div>}
             </div>
             {invoice.delivery_address && (
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Deliver To</div>
-                <div className="font-semibold text-gray-900">{customer?.clinic_name}</div>
-                {customer?.contact_person && <div className="text-sm text-gray-600">{customer.contact_person}</div>}
+                {invoice.ship_to_name && <div className="font-semibold text-gray-900">{invoice.ship_to_name}</div>}
+                {invoice.ship_to_contact && <div className="text-sm text-gray-600">{invoice.ship_to_contact}</div>}
                 <div className="text-sm text-gray-500 whitespace-pre-line">{invoice.delivery_address}</div>
               </div>
             )}
@@ -605,28 +635,48 @@ export default function InvoiceDetailPage() {
         </Card>
       )}
 
-      {/* Edit address dialog */}
-      <Dialog open={addressOpen} onOpenChange={setAddressOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit address</DialogTitle></DialogHeader>
+      {/* Edit recipient dialog */}
+      <Dialog open={recipientOpen} onOpenChange={setRecipientOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit recipient</DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Billing address</Label>
-              <Textarea
-                rows={3}
-                placeholder="Billing address"
-                value={editBilling}
-                onChange={e => setEditBilling(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Delivery address</Label>
-              <Textarea
-                rows={3}
-                placeholder="Delivery address (optional)"
-                value={editDelivery}
-                onChange={e => setEditDelivery(e.target.value)}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Bill To</div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Name</Label>
+                  <Input value={editBillToName} onChange={e => setEditBillToName(e.target.value)} placeholder="Recipient name" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Contact person</Label>
+                  <Input value={editBillToContact} onChange={e => setEditBillToContact(e.target.value)} placeholder="Optional" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Phone</Label>
+                  <Input value={editBillToPhone} onChange={e => setEditBillToPhone(e.target.value)} placeholder="Optional" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Address</Label>
+                  <Textarea value={editBilling} onChange={e => setEditBilling(e.target.value)} rows={3} placeholder="Billing address" />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Deliver To</div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Name</Label>
+                  <Input value={editShipToName} onChange={e => setEditShipToName(e.target.value)} placeholder="Recipient name" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Contact person</Label>
+                  <Input value={editShipToContact} onChange={e => setEditShipToContact(e.target.value)} placeholder="Optional" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Address</Label>
+                  <Textarea value={editDelivery} onChange={e => setEditDelivery(e.target.value)} rows={6} placeholder="Leave empty to hide Deliver To block" />
+                </div>
+              </div>
             </div>
             <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
               <input
@@ -638,14 +688,14 @@ export default function InvoiceDetailPage() {
               <span>
                 Also save to customer record
                 <span className="block text-xs text-gray-500">
-                  Updates the master address for {customer?.clinic_name ?? 'this customer'} so future invoices use these values.
+                  Updates the master customer with the Bill To values, plus both addresses. Future invoices use these defaults.
                 </span>
               </span>
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddressOpen(false)} disabled={savingAddress}>Cancel</Button>
-            <Button onClick={saveAddress} disabled={savingAddress}>{savingAddress ? 'Saving…' : 'Save'}</Button>
+            <Button variant="outline" onClick={() => setRecipientOpen(false)} disabled={savingRecipient}>Cancel</Button>
+            <Button onClick={saveRecipient} disabled={savingRecipient}>{savingRecipient ? 'Saving…' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
