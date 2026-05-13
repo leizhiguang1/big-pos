@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency, cn } from '@/lib/utils'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { Customer, Product, ServiceStatus } from '@/lib/database.types'
 import { addDays, format } from 'date-fns'
 import { fetchActiveServiceStatuses, DEFAULT_COLOR } from '@/lib/service-status'
@@ -40,8 +40,32 @@ export default function InvoiceCreatePage() {
   const [doctor, setDoctor] = useState('')
   const [serviceStatusId, setServiceStatusId] = useState<string | null>(null)
   const [items, setItems] = useState<LineItem[]>([{ product_id: null, description: '', quantity: 1, unit_price: 0 }])
+  const [billingAddress, setBillingAddress] = useState('')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [showAddress, setShowAddress] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const selectedCustomer = customers.find(c => c.id === customerId) ?? null
+
+  useEffect(() => {
+    if (!selectedCustomer) {
+      setBillingAddress('')
+      setDeliveryAddress('')
+      return
+    }
+    setBillingAddress(selectedCustomer.billing_address ?? '')
+    setDeliveryAddress(selectedCustomer.delivery_address ?? '')
+  }, [selectedCustomer])
+
+  const billingDirty = selectedCustomer ? billingAddress !== (selectedCustomer.billing_address ?? '') : false
+  const deliveryDirty = selectedCustomer ? deliveryAddress !== (selectedCustomer.delivery_address ?? '') : false
+  const addressDirty = billingDirty || deliveryDirty
+  const restoreFromCustomer = () => {
+    if (!selectedCustomer) return
+    setBillingAddress(selectedCustomer.billing_address ?? '')
+    setDeliveryAddress(selectedCustomer.delivery_address ?? '')
+  }
 
   useEffect(() => {
     Promise.all([
@@ -110,6 +134,8 @@ export default function InvoiceCreatePage() {
         patient: patient || null,
         doctor: doctor || null,
         service_status_id: serviceStatusId,
+        billing_address: billingAddress.trim() || null,
+        delivery_address: deliveryAddress.trim() || null,
         subtotal,
         total: subtotal,
       })
@@ -170,6 +196,60 @@ export default function InvoiceCreatePage() {
               </SelectContent>
             </Select>
           </div>
+
+          {selectedCustomer && (
+            <div className="rounded-md border border-gray-200 bg-gray-50/50">
+              <button
+                type="button"
+                onClick={() => setShowAddress(s => !s)}
+                className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-100/50"
+              >
+                <span className="flex items-center gap-2 text-gray-700">
+                  {showAddress ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <span className="font-medium">Billing / delivery address</span>
+                  {addressDirty && !showAddress && (
+                    <span className="text-xs font-medium text-amber-600">Edited</span>
+                  )}
+                </span>
+                {!showAddress && (
+                  <span className="truncate max-w-[260px] text-xs text-gray-500">
+                    {billingAddress.split('\n')[0] || 'No billing address'}
+                  </span>
+                )}
+              </button>
+              {showAddress && (
+                <div className="space-y-3 border-t border-gray-200 p-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Billing address</Label>
+                    <Textarea
+                      placeholder="Billing address"
+                      value={billingAddress}
+                      onChange={e => setBillingAddress(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Delivery address</Label>
+                    <Textarea
+                      placeholder="Delivery address (optional)"
+                      value={deliveryAddress}
+                      onChange={e => setDeliveryAddress(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500">Edits apply to this invoice only.</p>
+                    {addressDirty && (
+                      <Button type="button" variant="ghost" size="sm" onClick={restoreFromCustomer} className="h-7 text-xs">
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Restore from customer
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

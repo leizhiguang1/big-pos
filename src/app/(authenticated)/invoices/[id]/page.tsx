@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight, Pencil } from 'lucide-react'
 import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStatus, ServiceStatus } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
 import { cn } from '@/lib/utils'
@@ -61,6 +61,11 @@ export default function InvoiceDetailPage() {
   const [markingPaid, setMarkingPaid] = useState(false)
   const [voidOpen, setVoidOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
+  const [addressOpen, setAddressOpen] = useState(false)
+  const [editBilling, setEditBilling] = useState('')
+  const [editDelivery, setEditDelivery] = useState('')
+  const [alsoSaveToCustomer, setAlsoSaveToCustomer] = useState(false)
+  const [savingAddress, setSavingAddress] = useState(false)
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PaymentForm>({
     resolver: zodResolver(paymentSchema),
@@ -171,6 +176,34 @@ export default function InvoiceDetailPage() {
     load()
   }
 
+  const openAddressDialog = () => {
+    if (!invoice) return
+    setEditBilling(invoice.billing_address ?? '')
+    setEditDelivery(invoice.delivery_address ?? '')
+    setAlsoSaveToCustomer(false)
+    setAddressOpen(true)
+  }
+
+  const saveAddress = async () => {
+    if (!invoice) return
+    setSavingAddress(true)
+    const nextBilling = editBilling.trim() || null
+    const nextDelivery = editDelivery.trim() || null
+    await supabase
+      .from('invoices')
+      .update({ billing_address: nextBilling, delivery_address: nextDelivery })
+      .eq('id', invoice.id)
+    if (alsoSaveToCustomer && invoice.customer_id) {
+      await supabase
+        .from('customers')
+        .update({ billing_address: nextBilling, delivery_address: nextDelivery })
+        .eq('id', invoice.customer_id)
+    }
+    setSavingAddress(false)
+    setAddressOpen(false)
+    load()
+  }
+
   const handlePrint = () => window.print()
 
   if (loading) return <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
@@ -254,20 +287,32 @@ export default function InvoiceDetailPage() {
 
         {/* Bill To / Deliver To + Case Details */}
         <div className="mb-8 flex flex-wrap gap-6 justify-between">
-          <div className={`grid gap-6 flex-1 ${customer?.delivery_address ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-6 flex-1 ${invoice.delivery_address ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Bill To</div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Bill To</div>
+                {invoice.status !== 'void' && (
+                  <button
+                    type="button"
+                    onClick={openAddressDialog}
+                    className="print:hidden text-gray-400 hover:text-primary"
+                    aria-label="Edit address"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
               <div className="font-semibold text-gray-900">{customer?.clinic_name}</div>
               {customer?.contact_person && <div className="text-sm text-gray-600">{customer.contact_person}</div>}
-              {customer?.billing_address && <div className="text-sm text-gray-500 whitespace-pre-line">{customer.billing_address}</div>}
+              {invoice.billing_address && <div className="text-sm text-gray-500 whitespace-pre-line">{invoice.billing_address}</div>}
               {customer?.phone && <div className="text-sm text-gray-500">Tel: {customer.phone}</div>}
             </div>
-            {customer?.delivery_address && (
+            {invoice.delivery_address && (
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Deliver To</div>
                 <div className="font-semibold text-gray-900">{customer?.clinic_name}</div>
                 {customer?.contact_person && <div className="text-sm text-gray-600">{customer.contact_person}</div>}
-                <div className="text-sm text-gray-500 whitespace-pre-line">{customer.delivery_address}</div>
+                <div className="text-sm text-gray-500 whitespace-pre-line">{invoice.delivery_address}</div>
               </div>
             )}
           </div>
@@ -559,6 +604,51 @@ export default function InvoiceDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit address dialog */}
+      <Dialog open={addressOpen} onOpenChange={setAddressOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit address</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Billing address</Label>
+              <Textarea
+                rows={3}
+                placeholder="Billing address"
+                value={editBilling}
+                onChange={e => setEditBilling(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Delivery address</Label>
+              <Textarea
+                rows={3}
+                placeholder="Delivery address (optional)"
+                value={editDelivery}
+                onChange={e => setEditDelivery(e.target.value)}
+              />
+            </div>
+            <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                checked={alsoSaveToCustomer}
+                onChange={e => setAlsoSaveToCustomer(e.target.checked)}
+              />
+              <span>
+                Also save to customer record
+                <span className="block text-xs text-gray-500">
+                  Updates the master address for {customer?.clinic_name ?? 'this customer'} so future invoices use these values.
+                </span>
+              </span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddressOpen(false)} disabled={savingAddress}>Cancel</Button>
+            <Button onClick={saveAddress} disabled={savingAddress}>{savingAddress ? 'Saving…' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Void confirmation dialog */}
       <Dialog open={voidOpen} onOpenChange={setVoidOpen}>
