@@ -39,9 +39,13 @@
 }
 
 @media print {
+  /* Keep the @page margin small so the printed document still has breathing
+     room even when the user picks "No margins" in the browser print dialog —
+     the rest of the safety inset comes from the padding on #invoice-print
+     below. Default-margin total: 8mm + 8mm = 16mm. No-margin total: 0mm + 8mm. */
   @page {
     size: A4;
-    margin: 16mm;
+    margin: 8mm;
   }
 
   /* Force background colors / badges / colored panels to actually print.
@@ -74,9 +78,27 @@
   nav, aside, header {
     display: none !important;
   }
+
+  /* Print only the invoice/delivery note document. Everything else on the page
+     (action bar cards, work status, etc.) AND any open Radix dialogs/overlays
+     that are still in the DOM during the exit animation get hidden via the
+     visibility trick. position:absolute pulls #invoice-print to the top-left
+     so the printed page starts at the @page margin, not wherever the element
+     happened to be in the on-screen layout. */
+  body * {
+    visibility: hidden !important;
+  }
+  #invoice-print, #invoice-print * {
+    visibility: visible !important;
+  }
   #invoice-print {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
     border: none !important;
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 8mm !important;
+    box-sizing: border-box !important;
   }
 }
