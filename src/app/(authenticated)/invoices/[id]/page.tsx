@@ -21,6 +21,8 @@ import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight, Pencil, Lock } from 'lucide-react'
 import { canEditInvoice } from '@/lib/invoice-permissions'
+import { isVoided } from '@/lib/invoice-status'
+import { voidInvoice as voidInvoiceAction, restoreInvoice } from '@/lib/invoices/void-actions'
 import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStatus, ServiceStatus, Product } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
 import { cn } from '@/lib/utils'
@@ -29,7 +31,7 @@ import { WorkStatusBadge } from '@/components/work-status-badge'
 import { fetchActiveServiceStatuses, DEFAULT_COLOR } from '@/lib/service-status'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
-  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive', void: 'secondary',
+  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive',
 }
 
 const paymentSchema = z.object({
@@ -69,7 +71,7 @@ type PrintOverrides = {
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { user, role } = useAuth()
+  const { user, role, isAdmin } = useAuth()
   const printRef = useRef<HTMLDivElement>(null)
 
   const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -89,6 +91,8 @@ export default function InvoiceDetailPage() {
   const [markingPaid, setMarkingPaid] = useState(false)
   const [voidOpen, setVoidOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
+  const [voidReason, setVoidReason] = useState('')
+  const [restoring, setRestoring] = useState(false)
   const [recipientOpen, setRecipientOpen] = useState(false)
   const [editBillToName, setEditBillToName] = useState('')
   const [editBillToContact, setEditBillToContact] = useState('')
@@ -211,9 +215,20 @@ export default function InvoiceDetailPage() {
   const voidInvoice = async () => {
     if (!invoice) return
     setVoiding(true)
-    await supabase.from('invoices').update({ status: 'void' }).eq('id', invoice.id)
+    const res = await voidInvoiceAction({ id: invoice.id, reason: voidReason })
     setVoiding(false)
     setVoidOpen(false)
+    setVoidReason('')
+    if (!res.ok) { alert(res.error); return }
+    load()
+  }
+
+  const restore = async () => {
+    if (!invoice) return
+    setRestoring(true)
+    const res = await restoreInvoice({ id: invoice.id })
+    setRestoring(false)
+    if (!res.ok) { alert(res.error); return }
     load()
   }
 
@@ -365,7 +380,7 @@ export default function InvoiceDetailPage() {
     const isDelivery = mode === 'delivery'
     return (
       <>
-        {invoice.status === 'void' && (
+        {isVoided(invoice) && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 rounded-lg overflow-hidden">
             <span className="text-red-200 text-[120px] font-black uppercase tracking-widest rotate-[-30deg] select-none opacity-60">
               VOID
@@ -562,7 +577,8 @@ export default function InvoiceDetailPage() {
 
   // Content editing (Edit form, recipient, patient/doctor) is gated by status + role.
   // Workflow actions (payments, mark sent/paid, void, print) are unaffected.
-  const canEdit = canEditInvoice(invoice.status, role)
+  const voided = isVoided(invoice)
+  const canEdit = canEditInvoice(invoice, role)
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -576,7 +592,10 @@ export default function InvoiceDetailPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">{invoice.invoice_number}</h1>
               <Badge variant={STATUS_VARIANT[invoice.status] ?? 'secondary'} className="capitalize">{invoice.status}</Badge>
-              {invoice.status !== 'void' && !canEdit && (
+              {voided && (
+                <Badge variant="destructive" className="uppercase">Voided</Badge>
+              )}
+              {!voided && !canEdit && (
                 <span
                   className="inline-flex items-center gap-1 text-xs text-gray-500"
                   title="This invoice has been sent. Only an admin can edit it."
@@ -591,10 +610,10 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {invoice.status === 'draft' && (
+          {!voided && invoice.status === 'draft' && (
             <Button variant="outline" size="sm" onClick={markAsSent}>Mark as Sent</Button>
           )}
-          {['sent', 'partial', 'overdue'].includes(invoice.status) && (
+          {!voided && ['sent', 'partial', 'overdue'].includes(invoice.status) && (
             <>
               <Button variant="outline" size="sm" onClick={() => { reset({ payment_date: new Date().toISOString().split('T')[0], amount: outstanding > 0 ? outstanding : undefined }); setPaymentOpen(true) }}>
                 <CreditCard className="h-4 w-4 mr-2" />Record Payment
@@ -617,7 +636,7 @@ export default function InvoiceDetailPage() {
           <Button variant="outline" size="sm" onClick={() => openPrintDialog('delivery')}>
             <Printer className="h-4 w-4 mr-2" />Delivery Note
           </Button>
-          {invoice.status !== 'void' && (
+          {isAdmin && !voided && (
             <Button
               variant="outline"
               size="sm"
@@ -625,6 +644,11 @@ export default function InvoiceDetailPage() {
               onClick={() => setVoidOpen(true)}
             >
               <Ban className="h-4 w-4 mr-2" />Void
+            </Button>
+          )}
+          {isAdmin && voided && (
+            <Button variant="outline" size="sm" onClick={restore} disabled={restoring}>
+              {restoring ? 'Restoring…' : 'Restore'}
             </Button>
           )}
         </div>
@@ -636,7 +660,7 @@ export default function InvoiceDetailPage() {
       </div>
 
       {/* Case details — editable, hidden on print */}
-      {invoice.status !== 'void' && (
+      {!voided && (
         <Card className="print:hidden">
           <CardHeader><CardTitle className="text-base">Case Details</CardTitle></CardHeader>
           <CardContent>
@@ -673,7 +697,7 @@ export default function InvoiceDetailPage() {
       )}
 
       {/* Service status — what the lab is telling the doctor (Try in / Redo / …) */}
-      {invoice.status !== 'void' && (
+      {!voided && (
         <Card className="print:hidden">
           <CardHeader>
             <CardTitle className="text-base">Service Status</CardTitle>
@@ -716,7 +740,7 @@ export default function InvoiceDetailPage() {
       )}
 
       {/* Work status — hidden on print */}
-      {invoice.status !== 'void' && items.length > 0 && (
+      {!voided && items.length > 0 && (
         <Card className="print:hidden">
           <CardHeader>
             <CardTitle className="text-base">Work Status</CardTitle>
@@ -1137,9 +1161,13 @@ export default function InvoiceDetailPage() {
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-600">
-            Are you sure you want to void <span className="font-semibold">{invoice?.invoice_number}</span>?
-            This cannot be undone. The invoice will be marked as void and excluded from revenue reports.
+            Void <span className="font-semibold">{invoice?.invoice_number}</span>? It will be excluded
+            from revenue and reports. You can restore it later.
           </p>
+          <div className="space-y-2">
+            <Label>Reason (optional)</Label>
+            <Input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="e.g. duplicate, entry error" />
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setVoidOpen(false)}>Cancel</Button>
             <Button
