@@ -634,7 +634,7 @@ export default function InvoiceDetailPage() {
             <Printer className="h-4 w-4 mr-2" />Print Invoice
           </Button>
           <Button variant="outline" size="sm" onClick={() => openPrintDialog('delivery')}>
-            <Printer className="h-4 w-4 mr-2" />Delivery Note
+            <Printer className="h-4 w-4 mr-2" />Print Delivery
           </Button>
           {isAdmin && !voided && (
             <Button
