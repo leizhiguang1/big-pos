@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Users, FileText, Package, BarChart3,
-  Wrench, Settings, LogOut, Menu, X, ChevronRight,
+  Wrench, Settings, UserCog, LogOut, Menu, X, ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -23,11 +23,24 @@ const navItems = [
   { href: '/settings', icon: Settings, label: 'Settings' },
 ]
 
+const adminNavItems = [
+  { href: '/settings/employees', icon: UserCog, label: 'Employees' },
+]
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { username, role, signOut } = useAuth()
+  const { username, role, isAdmin, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const items = isAdmin ? [...navItems, ...adminNavItems] : navItems
+
+  // Only the most specific matching item is active, so /settings/employees
+  // highlights Employees alone — not Settings as well via its /settings prefix.
+  const activeHref = items.reduce((best, item) => {
+    const matches = pathname === item.href || pathname.startsWith(`${item.href}/`)
+    return matches && item.href.length > best.length ? item.href : best
+  }, '')
 
   const handleSignOut = async () => {
     await signOut()
@@ -51,8 +64,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Separator />
 
       <nav className="flex-1 p-3 space-y-1">
-        {navItems.map(({ href, icon: Icon, label }) => {
-          const isActive = pathname === href || pathname.startsWith(`${href}/`)
+        {items.map(({ href, icon: Icon, label }) => {
+          const isActive = href === activeHref
           return (
             <Link
               key={href}

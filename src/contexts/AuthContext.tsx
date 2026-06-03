@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null
   username: string
   role: string
+  isAdmin: boolean
   loading: boolean
   signOut: () => Promise<void>
 }
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   username: '',
   role: 'staff',
+  isAdmin: false,
   loading: true,
   signOut: async () => {},
 })
@@ -44,10 +46,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const username: string = session?.user?.user_metadata?.username ?? ''
-  const role: string = session?.user?.user_metadata?.role ?? 'staff'
+  // Authoritative role lives in app_metadata (only the service role can set it);
+  // fall back to user_metadata for sessions issued before that move.
+  const role: string =
+    (session?.user?.app_metadata?.role as string | undefined) ??
+    session?.user?.user_metadata?.role ??
+    'staff'
+  const isAdmin = role === 'admin'
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, username, role, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, username, role, isAdmin, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )

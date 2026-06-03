@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { COMPANY } from '@/lib/config'
+import { usernameToEmail } from '@/lib/auth/username'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -26,7 +27,7 @@ export default function LoginPage() {
     setError('')
 
     // Internal email constructed from username — never exposed to user
-    const email = `${username.toLowerCase()}@chidentallab.local`
+    const email = usernameToEmail(username)
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password: pin })
 
     if (authError) {

@@ -1,5 +1,6 @@
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue' | 'void'
 export type WorkStatus = 'received' | 'in_progress' | 'qc' | 'ready' | 'delivered' | 'on_hold'
+export type ProfileRole = 'admin' | 'staff'
 
 export interface Customer {
   id: string
@@ -33,6 +34,16 @@ export interface ServiceStatus {
   sort_order: number
   is_active: boolean
   created_at: string
+}
+
+export interface Profile {
+  id: string
+  username: string
+  full_name: string
+  role: ProfileRole
+  active: boolean
+  created_at: string
+  updated_at: string
 }
 
 export interface Invoice {
@@ -107,6 +118,8 @@ type InvoiceItemInsert = Omit<InvoiceItem, 'id' | 'created_at' | 'work_status' |
 type PaymentInsert = Omit<Payment, 'id' | 'created_at'>
 type StatusHistoryInsert = Omit<InvoiceItemStatusHistory, 'id' | 'changed_at'>
 type ServiceStatusInsert = Omit<ServiceStatus, 'id' | 'created_at'>
+type ProfileInsert = Omit<Profile, 'created_at' | 'updated_at' | 'full_name' | 'role' | 'active'> &
+  Partial<Pick<Profile, 'full_name' | 'role' | 'active'>>
 
 export type Database = {
   public: {
@@ -118,10 +131,12 @@ export type Database = {
       invoice_item_status_history:  { Row: InvoiceItemStatusHistory;   Insert: StatusHistoryInsert;  Update: Partial<StatusHistoryInsert>;  Relationships: [] }
       payments:                     { Row: Payment;                    Insert: PaymentInsert;        Update: Partial<PaymentInsert>;        Relationships: [] }
       service_statuses:             { Row: ServiceStatus;              Insert: ServiceStatusInsert;  Update: Partial<ServiceStatusInsert>;  Relationships: [] }
+      profiles:                     { Row: Profile;                    Insert: ProfileInsert;        Update: Partial<ProfileInsert>;        Relationships: [] }
     }
     Views: Record<string, never>
     Functions: {
       generate_invoice_number: { Args: Record<string, never>; Returns: string }
+      is_admin: { Args: Record<string, never>; Returns: boolean }
     }
     Enums: {
       work_status: WorkStatus
