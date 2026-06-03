@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { FileText, Users, DollarSign, AlertCircle, Plus } from 'lucide-react'
 import type { Invoice } from '@/lib/database.types'
+import { countsAsRevenue, isOutstanding } from '@/lib/invoice-status'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'outline' | 'info'> = {
   draft: 'secondary',
@@ -33,7 +34,7 @@ export default function DashboardPage() {
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
       const [invoicesRes, customersRes, recentRes] = await Promise.all([
-        supabase.from('invoices').select('total, status, due_date'),
+        supabase.from('invoices').select('total, status, due_date, voided_at'),
         supabase.from('customers').select('id', { count: 'exact', head: true }),
         supabase
           .from('invoices')
@@ -44,10 +45,10 @@ export default function DashboardPage() {
 
       const invoices = invoicesRes.data ?? []
       const revenue = invoices
-        .filter(i => i.status === 'paid' && i.due_date >= firstOfMonth)
+        .filter(i => countsAsRevenue(i) && i.due_date >= firstOfMonth)
         .reduce((s, i) => s + Number(i.total), 0)
       const outstanding = invoices
-        .filter(i => ['sent', 'partial', 'overdue'].includes(i.status))
+        .filter(i => isOutstanding(i))
         .reduce((s, i) => s + Number(i.total), 0)
 
       setStats({

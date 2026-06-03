@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowLeft, Edit, Plus, Phone, Mail, MapPin, Truck } from 'lucide-react'
 import type { Customer, Invoice } from '@/lib/database.types'
+import { isOutstanding, isVoided } from '@/lib/invoice-status'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
   draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive', void: 'secondary',
@@ -39,9 +40,9 @@ export default function CustomerDetailPage() {
   if (loading) return <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
   if (!customer) return <p className="text-gray-500">Customer not found.</p>
 
-  const totalBilled = invoices.reduce((s, i) => s + Number(i.total), 0)
+  const totalBilled = invoices.filter(i => !isVoided(i)).reduce((s, i) => s + Number(i.total), 0)
   const totalOutstanding = invoices
-    .filter(i => ['sent', 'partial', 'overdue'].includes(i.status))
+    .filter(i => isOutstanding(i))
     .reduce((s, i) => s + Number(i.total), 0)
 
   return (
@@ -152,7 +153,9 @@ export default function CustomerDetailPage() {
                   <TableCell className="text-gray-500 text-sm">{formatDate(inv.due_date)}</TableCell>
                   <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
                   <TableCell>
-                    <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>
+                    {isVoided(inv)
+                      ? <Badge variant="destructive" className="uppercase">Voided</Badge>
+                      : <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>}
                   </TableCell>
                 </TableRow>
               ))}

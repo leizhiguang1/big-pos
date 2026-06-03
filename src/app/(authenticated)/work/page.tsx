@@ -25,6 +25,7 @@ type Row = {
     id: string
     invoice_number: string
     status: string
+    voided_at: string | null
     customers: { clinic_name: string } | null
   } | null
 }
@@ -69,10 +70,10 @@ export default function WorkPage() {
   const load = async () => {
     const { data } = await supabase
       .from('invoice_items')
-      .select('id, description, work_status, work_status_updated_at, invoices(id, invoice_number, status, customers(clinic_name))')
+      .select('id, description, work_status, work_status_updated_at, invoices(id, invoice_number, status, voided_at, customers(clinic_name))')
       .order('work_status_updated_at', { ascending: false })
       .order('id', { ascending: true })
-    const items = ((data ?? []) as unknown as Row[]).filter(r => r.invoices && r.invoices.status !== 'void')
+    const items = ((data ?? []) as unknown as Row[]).filter(r => r.invoices && r.invoices.voided_at == null)
     setRows(items)
     setLoading(false)
   }

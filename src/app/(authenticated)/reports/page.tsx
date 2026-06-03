@@ -13,6 +13,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import type { Invoice } from '@/lib/database.types'
+import { countsAsRevenue, isOutstanding, isVoided } from '@/lib/invoice-status'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
   draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive', void: 'secondary',
@@ -38,17 +39,20 @@ export default function ReportsPage() {
       })
   }, [dateFrom, dateTo])
 
+  // Voided invoices are cancelled — they must not count in any total.
+  const active = invoices.filter(i => !isVoided(i))
+
   // Revenue summary
-  const totalInvoiced = invoices.reduce((s, i) => s + Number(i.total), 0)
-  const totalPaidInvoices = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.total), 0)
+  const totalInvoiced = active.reduce((s, i) => s + Number(i.total), 0)
+  const totalPaidInvoices = invoices.filter(i => countsAsRevenue(i)).reduce((s, i) => s + Number(i.total), 0)
   const totalOutstanding = invoices
-    .filter(i => ['sent', 'partial', 'overdue'].includes(i.status))
+    .filter(i => isOutstanding(i))
     .reduce((s, i) => s + Number(i.total), 0)
 
   // Outstanding invoices with aging
   const now = new Date()
   const outstanding = invoices
-    .filter(i => ['sent', 'partial', 'overdue'].includes(i.status))
+    .filter(i => isOutstanding(i))
     .map(i => {
       const dueDate = new Date(i.due_date)
       const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / 86400000)
@@ -58,7 +62,7 @@ export default function ReportsPage() {
 
   // Sales by customer
   const byCustomer = Object.values(
-    invoices.reduce((acc, inv) => {
+    active.reduce((acc, inv) => {
       const name = (inv.customers as { clinic_name: string })?.clinic_name ?? 'Unknown'
       if (!acc[name]) acc[name] = { name, total: 0, count: 0 }
       acc[name].total += Number(inv.total)
@@ -69,7 +73,7 @@ export default function ReportsPage() {
 
   // Sales by product
   const byProduct: Record<string, { name: string; total: number; qty: number }> = {}
-  invoices.forEach(inv => {
+  active.forEach(inv => {
     const items = (inv.invoice_items ?? []) as Array<{ description: string; amount: number; quantity: number; products?: { name: string } }>
     items.forEach(item => {
       const name = item.products?.name ?? item.description
