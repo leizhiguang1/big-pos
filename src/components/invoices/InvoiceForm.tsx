@@ -58,6 +58,8 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
   const [error, setError] = useState('')
   // Status of the loaded invoice (edit mode) — drives the edit lock guard + banner.
   const [loadedStatus, setLoadedStatus] = useState<InvoiceStatus | null>(null)
+  // Void (soft-delete) marker of the loaded invoice — voided invoices are locked for everyone.
+  const [loadedVoidedAt, setLoadedVoidedAt] = useState<string | null>(null)
 
   // Item ids present when the invoice was loaded — used to compute deletes on save.
   const originalItemIdsRef = useRef<string[]>([])
@@ -90,6 +92,7 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
       const inv = invRes.data as Invoice | null
       if (inv) {
         setLoadedStatus(inv.status)
+        setLoadedVoidedAt(inv.voided_at)
         setCustomerId(inv.customer_id)
         setInvoiceDate(inv.invoice_date)
         setDueDate(inv.due_date ?? '')
@@ -129,10 +132,10 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
   // Deep-links to a locked invoice are redirected back to its detail page.
   useEffect(() => {
     if (!isEdit || authLoading || loadedStatus === null) return
-    if (!canEditInvoice(loadedStatus, role)) {
+    if (!canEditInvoice({ status: loadedStatus, voided_at: loadedVoidedAt }, role)) {
       router.replace(`/invoices/${invoiceId}`)
     }
-  }, [isEdit, authLoading, loadedStatus, role, invoiceId, router])
+  }, [isEdit, authLoading, loadedStatus, loadedVoidedAt, role, invoiceId, router])
 
   // When the user picks a (different) customer, fill the recipient block from
   // that customer's master record. Skipped on initial load in edit mode.
@@ -322,7 +325,7 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
   }
 
   // While auth resolves or a locked invoice redirects away, hold on the spinner.
-  const blocked = isEdit && loadedStatus !== null && !authLoading && !canEditInvoice(loadedStatus, role)
+  const blocked = isEdit && loadedStatus !== null && !authLoading && !canEditInvoice({ status: loadedStatus, voided_at: loadedVoidedAt }, role)
 
   if (loading || blocked) {
     return <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>

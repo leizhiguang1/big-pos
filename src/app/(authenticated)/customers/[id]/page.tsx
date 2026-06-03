@@ -15,7 +15,7 @@ import type { Customer, Invoice } from '@/lib/database.types'
 import { isOutstanding, isVoided } from '@/lib/invoice-status'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
-  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive', void: 'secondary',
+  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive',
 }
 
 export default function CustomerDetailPage() {

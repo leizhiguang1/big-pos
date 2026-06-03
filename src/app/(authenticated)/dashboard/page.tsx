@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { FileText, Users, DollarSign, AlertCircle, Plus } from 'lucide-react'
 import type { Invoice } from '@/lib/database.types'
-import { countsAsRevenue, isOutstanding } from '@/lib/invoice-status'
+import { countsAsRevenue, isOutstanding, isVoided } from '@/lib/invoice-status'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'outline' | 'info'> = {
   draft: 'secondary',
@@ -19,7 +19,6 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warn
   partial: 'warning',
   paid: 'success',
   overdue: 'destructive',
-  void: 'secondary',
 }
 
 export default function DashboardPage() {
@@ -150,9 +149,11 @@ export default function DashboardPage() {
                   <TableCell className="text-gray-500">{formatDate(inv.invoice_date)}</TableCell>
                   <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
                   <TableCell>
-                    <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">
-                      {inv.status}
-                    </Badge>
+                    {isVoided(inv)
+                      ? <Badge variant="destructive" className="uppercase">Voided</Badge>
+                      : <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">
+                          {inv.status}
+                        </Badge>}
                   </TableCell>
                 </TableRow>
               ))}
