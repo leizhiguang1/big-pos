@@ -19,7 +19,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight, Pencil } from 'lucide-react'
+import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight, Pencil, Lock } from 'lucide-react'
+import { canEditInvoice } from '@/lib/invoice-permissions'
 import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStatus, ServiceStatus, Product } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
 import { cn } from '@/lib/utils'
@@ -68,7 +69,7 @@ type PrintOverrides = {
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const printRef = useRef<HTMLDivElement>(null)
 
   const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -403,7 +404,7 @@ export default function InvoiceDetailPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Bill To</div>
-                {showInlineEdit && invoice.status !== 'void' && (
+                {showInlineEdit && canEdit && (
                   <button
                     type="button"
                     onClick={openRecipientDialog}
@@ -559,6 +560,10 @@ export default function InvoiceDetailPage() {
   const printResolved = resolveFields(printOverrides)
   const draftResolved = printDraft ? resolveFields(printDraft) : null
 
+  // Content editing (Edit form, recipient, patient/doctor) is gated by status + role.
+  // Workflow actions (payments, mark sent/paid, void, print) are unaffected.
+  const canEdit = canEditInvoice(invoice.status, role)
+
   return (
     <div className="max-w-4xl space-y-6">
       {/* Actions bar — hidden on print */}
@@ -571,6 +576,14 @@ export default function InvoiceDetailPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">{invoice.invoice_number}</h1>
               <Badge variant={STATUS_VARIANT[invoice.status] ?? 'secondary'} className="capitalize">{invoice.status}</Badge>
+              {invoice.status !== 'void' && !canEdit && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs text-gray-500"
+                  title="This invoice has been sent. Only an admin can edit it."
+                >
+                  <Lock className="h-3 w-3" />Locked
+                </span>
+              )}
             </div>
             <Link href={`/customers/${invoice.customer_id}`} className="text-sm text-primary hover:underline">
               {customer?.clinic_name}
@@ -591,7 +604,7 @@ export default function InvoiceDetailPage() {
               </Button>
             </>
           )}
-          {invoice.status !== 'void' && (
+          {canEdit && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/invoices/${invoice.id}/edit`}>
                 <Pencil className="h-4 w-4 mr-2" />Edit
@@ -630,21 +643,29 @@ export default function InvoiceDetailPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Patient</Label>
-                <Input
-                  placeholder="Patient name"
-                  value={patient}
-                  onChange={e => setPatient(e.target.value)}
-                  onBlur={savePatientDoctor}
-                />
+                {canEdit ? (
+                  <Input
+                    placeholder="Patient name"
+                    value={patient}
+                    onChange={e => setPatient(e.target.value)}
+                    onBlur={savePatientDoctor}
+                  />
+                ) : (
+                  <p className="py-2 text-sm text-gray-900">{patient || '—'}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Doctor</Label>
-                <Input
-                  placeholder="Doctor name"
-                  value={doctor}
-                  onChange={e => setDoctor(e.target.value)}
-                  onBlur={savePatientDoctor}
-                />
+                {canEdit ? (
+                  <Input
+                    placeholder="Doctor name"
+                    value={doctor}
+                    onChange={e => setDoctor(e.target.value)}
+                    onBlur={savePatientDoctor}
+                  />
+                ) : (
+                  <p className="py-2 text-sm text-gray-900">{doctor || '—'}</p>
+                )}
               </div>
             </div>
           </CardContent>

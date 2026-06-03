@@ -13,9 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency, cn } from '@/lib/utils'
 import { ArrowLeft, ChevronDown, ChevronRight, Plus, RotateCcw, Trash2 } from 'lucide-react'
-import type { Customer, Product, ServiceStatus, Invoice, InvoiceItem } from '@/lib/database.types'
+import type { Customer, Product, ServiceStatus, Invoice, InvoiceItem, InvoiceStatus } from '@/lib/database.types'
 import { addDays, format } from 'date-fns'
 import { fetchActiveServiceStatuses, DEFAULT_COLOR } from '@/lib/service-status'
+import { canEditInvoice } from '@/lib/invoice-permissions'
 
 interface LineItem {
   id: string | null            // existing invoice_items.id, or null for a new row
@@ -30,7 +31,7 @@ const blankItem = (): LineItem => ({ id: null, product_id: null, description: ''
 export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user } = useAuth()
+  const { user, role, loading: authLoading } = useAuth()
   const isEdit = Boolean(invoiceId)
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -55,6 +56,8 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Status of the loaded invoice (edit mode) — drives the edit lock guard + banner.
+  const [loadedStatus, setLoadedStatus] = useState<InvoiceStatus | null>(null)
 
   // Item ids present when the invoice was loaded — used to compute deletes on save.
   const originalItemIdsRef = useRef<string[]>([])
@@ -86,6 +89,7 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
     ]).then(([invRes, itemsRes]) => {
       const inv = invRes.data as Invoice | null
       if (inv) {
+        setLoadedStatus(inv.status)
         setCustomerId(inv.customer_id)
         setInvoiceDate(inv.invoice_date)
         setDueDate(inv.due_date ?? '')
@@ -120,6 +124,15 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
       setLoading(false)
     })
   }, [isEdit, invoiceId])
+
+  // Edit lock: staff may only edit drafts; admins may edit any non-void invoice.
+  // Deep-links to a locked invoice are redirected back to its detail page.
+  useEffect(() => {
+    if (!isEdit || authLoading || loadedStatus === null) return
+    if (!canEditInvoice(loadedStatus, role)) {
+      router.replace(`/invoices/${invoiceId}`)
+    }
+  }, [isEdit, authLoading, loadedStatus, role, invoiceId, router])
 
   // When the user picks a (different) customer, fill the recipient block from
   // that customer's master record. Skipped on initial load in edit mode.
@@ -308,7 +321,10 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
     router.push(`/invoices/${invoiceId}`)
   }
 
-  if (loading) {
+  // While auth resolves or a locked invoice redirects away, hold on the spinner.
+  const blocked = isEdit && loadedStatus !== null && !authLoading && !canEditInvoice(loadedStatus, role)
+
+  if (loading || blocked) {
     return <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
   }
 
@@ -323,6 +339,12 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
           <p className="text-sm text-gray-500 mt-0.5">{isEdit ? 'Update invoice details and items' : 'Create and send to customer'}</p>
         </div>
       </div>
+
+      {isEdit && loadedStatus && loadedStatus !== 'draft' && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          You&rsquo;re editing a <span className="font-semibold capitalize">{loadedStatus}</span> invoice (admin override). Changes affect a document that has already been sent.
+        </div>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Invoice Details</CardTitle></CardHeader>
