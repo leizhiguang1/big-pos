@@ -319,7 +319,7 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
 
       {isEdit && loadedStatus && loadedStatus !== 'draft' && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-          You&rsquo;re editing a <span className="font-semibold capitalize">{loadedStatus}</span> invoice (admin override). Changes affect a document that has already been sent.
+          You&rsquo;re editing a <span className="font-semibold capitalize">{loadedStatus}</span> invoice. Changes affect a document that has already been sent.
         </div>
       )}
 
