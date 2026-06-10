@@ -36,14 +36,30 @@ export interface ServiceStatus {
   created_at: string
 }
 
+export interface Role {
+  id: string
+  name: string
+  description: string | null
+  is_system: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface RolePermission {
+  role_id: string
+  permission: string
+}
+
 export interface Profile {
   id: string
   username: string
   full_name: string
-  role: ProfileRole
+  role: ProfileRole | null
+  role_id: string | null
   active: boolean
   created_at: string
   updated_at: string
+  roles?: Role | null
 }
 
 export interface Invoice {
@@ -121,7 +137,7 @@ type InvoiceItemInsert = Omit<InvoiceItem, 'id' | 'created_at' | 'work_status' |
 type PaymentInsert = Omit<Payment, 'id' | 'created_at'>
 type StatusHistoryInsert = Omit<InvoiceItemStatusHistory, 'id' | 'changed_at'>
 type ServiceStatusInsert = Omit<ServiceStatus, 'id' | 'created_at'>
-type ProfileInsert = Omit<Profile, 'created_at' | 'updated_at' | 'full_name' | 'role' | 'active'> &
+type ProfileInsert = Omit<Profile, 'created_at' | 'updated_at' | 'full_name' | 'role' | 'active' | 'roles'> &
   Partial<Pick<Profile, 'full_name' | 'role' | 'active'>>
 
 export type Database = {
@@ -135,6 +151,8 @@ export type Database = {
       payments:                     { Row: Payment;                    Insert: PaymentInsert;        Update: Partial<PaymentInsert>;        Relationships: [] }
       service_statuses:             { Row: ServiceStatus;              Insert: ServiceStatusInsert;  Update: Partial<ServiceStatusInsert>;  Relationships: [] }
       profiles:                     { Row: Profile;                    Insert: ProfileInsert;        Update: Partial<ProfileInsert>;        Relationships: [] }
+      roles:                        { Row: Role;                       Insert: Omit<Role, 'id' | 'created_at' | 'updated_at'> & Partial<Pick<Role, 'id'>>; Update: Partial<Omit<Role, 'id' | 'created_at'>>; Relationships: [] }
+      role_permissions:             { Row: RolePermission;             Insert: RolePermission;       Update: Partial<RolePermission>;       Relationships: [] }
     }
     Views: Record<string, never>
     Functions: {
