@@ -1,6 +1,5 @@
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue'
 export type WorkStatus = 'received' | 'in_progress' | 'qc' | 'ready' | 'delivered' | 'on_hold'
-export type ProfileRole = 'admin' | 'staff'
 export type { Permission } from '@/lib/permissions'
 
 export interface Customer {
@@ -55,7 +54,6 @@ export interface Profile {
   id: string
   username: string
   full_name: string
-  role: ProfileRole | null
   role_id: string | null
   active: boolean
   created_at: string
@@ -138,8 +136,8 @@ type InvoiceItemInsert = Omit<InvoiceItem, 'id' | 'created_at' | 'work_status' |
 type PaymentInsert = Omit<Payment, 'id' | 'created_at'>
 type StatusHistoryInsert = Omit<InvoiceItemStatusHistory, 'id' | 'changed_at'>
 type ServiceStatusInsert = Omit<ServiceStatus, 'id' | 'created_at'>
-type ProfileInsert = Omit<Profile, 'created_at' | 'updated_at' | 'full_name' | 'role' | 'active' | 'roles'> &
-  Partial<Pick<Profile, 'full_name' | 'role' | 'active'>>
+type ProfileInsert = Omit<Profile, 'created_at' | 'updated_at' | 'full_name' | 'active' | 'roles'> &
+  Partial<Pick<Profile, 'full_name' | 'active'>>
 
 export type Database = {
   public: {
