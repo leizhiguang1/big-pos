@@ -11,10 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
-import { ArrowLeft, Plus, Pencil, KeyRound, UserCheck, UserX, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, KeyRound, UserCheck, UserX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Profile, Role } from '@/lib/database.types'
-import { createEmployee, updateEmployee, resetPin, setActive, deleteEmployee } from '@/lib/auth/employee-actions'
+import { createEmployee, updateEmployee, resetPin, setActive } from '@/lib/auth/employee-actions'
 
 type DialogState =
   | { mode: 'closed' }
@@ -56,18 +56,6 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
     })
   }
 
-  const remove = (p: Profile) => {
-    if (p.id === currentUserId) return
-    if (!confirm(`Permanently delete ${p.full_name}? This removes their login and cannot be undone.`)) return
-    setBusyId(p.id)
-    startTransition(async () => {
-      const res = await deleteEmployee({ id: p.id })
-      if (res.ok) await load()
-      else alert(res.error)
-      setBusyId(null)
-    })
-  }
-
   return (
     <TooltipProvider delayDuration={200}>
     <div className="max-w-3xl space-y-6">
@@ -98,7 +86,7 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
                 <TableHead>User ID</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-36 text-right">Actions</TableHead>
+                <TableHead className="w-28 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -146,16 +134,6 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
                         {p.active
                           ? <UserX className="h-4 w-4 text-red-500" />
                           : <UserCheck className="h-4 w-4 text-green-600" />}
-                      </TipButton>
-                      <TipButton
-                        label={p.id === currentUserId ? 'You cannot delete yourself' : 'Delete permanently'}
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        disabled={p.id === currentUserId || busyId === p.id}
-                        onClick={() => remove(p)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
                       </TipButton>
                     </div>
                   </TableCell>
