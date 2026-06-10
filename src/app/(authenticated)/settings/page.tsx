@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
-import { ChevronRight, ClipboardList, UserCog } from 'lucide-react'
+import { ChevronRight, ClipboardList, UserCog, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const sections = [
@@ -14,18 +14,18 @@ const sections = [
   },
 ]
 
-const adminSections = [
-  {
-    href: '/settings/employees',
-    icon: UserCog,
-    title: 'Employees',
-    description: 'Add staff logins, reset PINs, set roles, and manage access.',
-  },
-]
-
 export default function SettingsPage() {
-  const { isAdmin } = useAuth()
-  const visibleSections = isAdmin ? [...sections, ...adminSections] : sections
+  const { hasPermission, isSuperadmin } = useAuth()
+
+  const visibleSections = [
+    ...sections,
+    ...(hasPermission('manageEmployees')
+      ? [{ href: '/settings/employees', icon: UserCog, title: 'Employees', description: 'Add staff logins, reset PINs, assign roles, and manage access.' }]
+      : []),
+    ...(isSuperadmin
+      ? [{ href: '/settings/roles', icon: ShieldCheck, title: 'Roles & Permissions', description: 'Create roles and choose what each one can do.' }]
+      : []),
+  ]
 
   return (
     <div className="max-w-3xl space-y-6">

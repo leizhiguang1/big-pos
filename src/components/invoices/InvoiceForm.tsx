@@ -31,7 +31,7 @@ const blankItem = (): LineItem => ({ id: null, product_id: null, description: ''
 export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, role, loading: authLoading } = useAuth()
+  const { user, hasPermission, loading: authLoading } = useAuth()
   const isEdit = Boolean(invoiceId)
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -61,8 +61,6 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
   // Void (soft-delete) marker of the loaded invoice — voided invoices are locked for everyone.
   const [loadedVoidedAt, setLoadedVoidedAt] = useState<string | null>(null)
 
-  // Item ids present when the invoice was loaded — used to compute deletes on save.
-  const originalItemIdsRef = useRef<string[]>([])
   // The customer id whose recipient defaults are already reflected in the form.
   // Guards the auto-fill effect so it doesn't clobber an invoice's saved recipient on load.
   const recipientSyncRef = useRef<string | null>(null)
@@ -112,7 +110,6 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         recipientSyncRef.current = inv.customer_id
       }
       const rows = (itemsRes.data ?? []) as InvoiceItem[]
-      originalItemIdsRef.current = rows.map(r => r.id)
       setItems(
         rows.length > 0
           ? rows.map(r => ({
@@ -132,10 +129,10 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
   // Deep-links to a locked invoice are redirected back to its detail page.
   useEffect(() => {
     if (!isEdit || authLoading || loadedStatus === null) return
-    if (!canEditInvoice({ status: loadedStatus, voided_at: loadedVoidedAt }, role)) {
+    if (!canEditInvoice({ status: loadedStatus, voided_at: loadedVoidedAt }, hasPermission)) {
       router.replace(`/invoices/${invoiceId}`)
     }
-  }, [isEdit, authLoading, loadedStatus, loadedVoidedAt, role, invoiceId, router])
+  }, [isEdit, authLoading, loadedStatus, loadedVoidedAt, hasPermission, invoiceId, router])
 
   // When the user picks a (different) customer, fill the recipient block from
   // that customer's master record. Skipped on initial load in edit mode.
@@ -248,22 +245,9 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
     setSaving(true)
     setError('')
 
-    const { data: invData, error: invError } = await supabase
-      .from('invoices')
-      .insert({ ...invoicePayload(), created_by: user!.id, status })
-      .select()
-      .single()
-
-    if (invError || !invData) {
-      setError(invError?.message ?? 'Failed to create invoice')
-      setSaving(false)
-      return
-    }
-
     const itemsPayload = items
       .filter(i => i.description.trim())
       .map(i => ({
-        invoice_id: (invData as Invoice).id,
         product_id: i.product_id,
         description: i.description.trim(),
         quantity: i.quantity,
@@ -271,13 +255,18 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         amount: i.quantity * i.unit_price,
       }))
 
-    const { error: itemsError } = await supabase.from('invoice_items').insert(itemsPayload)
-    if (itemsError) {
-      setError(itemsError.message)
+    // Single transactional RPC: invoice header + all items succeed or fail together.
+    const { data: newId, error } = await supabase.rpc('create_invoice_with_items', {
+      p_invoice: { ...invoicePayload(), created_by: user!.id, status },
+      p_items: itemsPayload,
+    })
+
+    if (error || !newId) {
+      setError(error?.message ?? 'Failed to create invoice')
       setSaving(false)
       return
     }
-    router.push(`/invoices/${(invData as Invoice).id}`)
+    router.push(`/invoices/${newId as string}`)
   }
 
   const handleUpdate = async () => {
@@ -285,47 +274,32 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
     setSaving(true)
     setError('')
 
-    const rows = items.filter(i => i.description.trim())
-    const keptIds = new Set(rows.filter(r => r.id).map(r => r.id as string))
-
-    const toDelete = originalItemIdsRef.current.filter(id => !keptIds.has(id))
-    const toInsert = rows
-      .filter(r => !r.id)
-      .map(r => ({
-        invoice_id: invoiceId,
-        product_id: r.product_id,
-        description: r.description.trim(),
-        quantity: r.quantity,
-        unit_price: r.unit_price,
-        amount: r.quantity * r.unit_price,
+    // The RPC diffs items by id: rows with an id are updated, rows without are
+    // inserted, and any previously-saved id absent from this list is deleted —
+    // all inside one transaction.
+    const itemsPayload = items
+      .filter(i => i.description.trim())
+      .map(i => ({
+        id: i.id,
+        product_id: i.product_id,
+        description: i.description.trim(),
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        amount: i.quantity * i.unit_price,
       }))
-    const toUpdate = rows.filter(r => r.id)
 
-    const ops: PromiseLike<{ error: { message: string } | null }>[] = []
-    ops.push(supabase.from('invoices').update(invoicePayload()).eq('id', invoiceId))
-    if (toDelete.length) ops.push(supabase.from('invoice_items').delete().in('id', toDelete))
-    if (toInsert.length) ops.push(supabase.from('invoice_items').insert(toInsert))
-    for (const r of toUpdate) {
-      ops.push(
-        supabase.from('invoice_items').update({
-          product_id: r.product_id,
-          description: r.description.trim(),
-          quantity: r.quantity,
-          unit_price: r.unit_price,
-          amount: r.quantity * r.unit_price,
-        }).eq('id', r.id as string),
-      )
-    }
-
-    const results = await Promise.all(ops)
-    const failed = results.find(res => res.error)
-    if (failed?.error) { setError(failed.error.message); setSaving(false); return }
+    const { error } = await supabase.rpc('update_invoice_with_items', {
+      p_invoice_id: invoiceId,
+      p_invoice: invoicePayload(),
+      p_items: itemsPayload,
+    })
+    if (error) { setError(error.message); setSaving(false); return }
 
     router.push(`/invoices/${invoiceId}`)
   }
 
   // While auth resolves or a locked invoice redirects away, hold on the spinner.
-  const blocked = isEdit && loadedStatus !== null && !authLoading && !canEditInvoice({ status: loadedStatus, voided_at: loadedVoidedAt }, role)
+  const blocked = isEdit && loadedStatus !== null && !authLoading && !canEditInvoice({ status: loadedStatus, voided_at: loadedVoidedAt }, hasPermission)
 
   if (loading || blocked) {
     return <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>
@@ -502,6 +476,8 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
           {items.map((item, i) => {
             const product = item.product_id ? products.find(p => p.id === item.product_id) : null
             const hasRange = product?.min_unit_price != null && product?.max_unit_price != null
+            // A catalog product with no min/max range is a fixed-price item: price is locked.
+            const isFixed = product != null && !hasRange
             const priceError = itemPriceErrors[i]
             return (
               <div key={item.id ?? `new-${i}`} className="grid grid-cols-12 gap-2 items-start">
@@ -527,18 +503,24 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
                 <Input
                   className="col-span-1 text-right"
                   type="number"
-                  min="0.01"
-                  step="0.01"
+                  min="1"
+                  step="1"
                   value={item.quantity}
-                  onChange={e => updateItem(i, 'quantity', parseFloat(e.target.value) || 0)}
+                  onChange={e => updateItem(i, 'quantity', Math.max(1, Math.floor(parseFloat(e.target.value) || 1)))}
                 />
                 <div className="col-span-2 space-y-1">
                   <Input
-                    className={cn('text-right', priceError && 'border-destructive focus-visible:ring-destructive')}
+                    className={cn(
+                      'text-right',
+                      priceError && 'border-destructive focus-visible:ring-destructive',
+                      isFixed && 'bg-gray-100 text-gray-600',
+                    )}
                     type="number"
-                    min="0"
+                    min={hasRange ? product!.min_unit_price! : 0}
+                    max={hasRange ? product!.max_unit_price! : undefined}
                     step="0.01"
                     value={item.unit_price}
+                    disabled={isFixed}
                     aria-invalid={priceError ? true : undefined}
                     onChange={e => updateItem(i, 'unit_price', parseFloat(e.target.value) || 0)}
                   />
@@ -548,6 +530,8 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
                     <p className="text-xs text-gray-400 text-right">
                       {formatCurrency(product!.min_unit_price!)} – {formatCurrency(product!.max_unit_price!)}
                     </p>
+                  ) : isFixed ? (
+                    <p className="text-xs text-gray-400 text-right">Fixed price</p>
                   ) : null}
                 </div>
                 <Button

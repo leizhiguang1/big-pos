@@ -23,17 +23,17 @@ const navItems = [
   { href: '/settings', icon: Settings, label: 'Settings' },
 ]
 
-const adminNavItems = [
-  { href: '/settings/employees', icon: UserCog, label: 'Employees' },
+const permissionNavItems = [
+  { href: '/settings/employees', icon: UserCog, label: 'Employees', permission: 'manageEmployees' as const },
 ]
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { username, role, isAdmin, signOut } = useAuth()
+  const { username, roleName, hasPermission, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const items = isAdmin ? [...navItems, ...adminNavItems] : navItems
+  const items = [...navItems, ...permissionNavItems.filter(i => hasPermission(i.permission))]
 
   // Only the most specific matching item is active, so /settings/employees
   // highlights Employees alone — not Settings as well via its /settings prefix.
@@ -91,7 +91,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="p-3">
         <div className="px-3 py-2 mb-1">
           <p className="text-sm font-medium text-gray-700 truncate">{username}</p>
-          <p className="text-xs text-gray-400 capitalize">{role}</p>
+          <p className="text-xs text-gray-400 capitalize">{roleName}</p>
         </div>
         <Button
           variant="ghost"

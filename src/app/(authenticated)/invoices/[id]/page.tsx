@@ -18,10 +18,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, todayISODate } from '@/lib/utils'
 import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight, Pencil, Lock } from 'lucide-react'
 import { canEditInvoice } from '@/lib/invoice-permissions'
-import { isVoided } from '@/lib/invoice-status'
+import { isVoided, isOverdue } from '@/lib/invoice-status'
 import { voidInvoice as voidInvoiceAction, restoreInvoice } from '@/lib/invoices/void-actions'
 import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStatus, ServiceStatus, Product } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
@@ -71,7 +71,7 @@ type PrintOverrides = {
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { user, role, isAdmin } = useAuth()
+  const { user, hasPermission } = useAuth()
   const printRef = useRef<HTMLDivElement>(null)
 
   const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -110,9 +110,11 @@ export default function InvoiceDetailPage() {
   const [printDraft, setPrintDraft] = useState<PrintOverrides | null>(null)
   const [printOverrides, setPrintOverrides] = useState<PrintOverrides | null>(null)
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<PaymentForm>({
+  const [actionError, setActionError] = useState('')
+
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<PaymentForm>({
     resolver: zodResolver(paymentSchema),
-    defaultValues: { payment_date: new Date().toISOString().split('T')[0] },
+    defaultValues: { payment_date: todayISODate() },
   })
 
   const load = async () => {
@@ -176,12 +178,15 @@ export default function InvoiceDetailPage() {
   useEffect(() => { load() }, [id])
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0)
-  const outstanding = invoice ? Number(invoice.total) - totalPaid : 0
+  // When an invoice is settled (status 'paid'), the balance is zero even if the
+  // recorded payments don't sum to the total — e.g. it was marked paid directly.
+  const outstanding = invoice ? (invoice.status === 'paid' ? 0 : Number(invoice.total) - totalPaid) : 0
 
   const onRecordPayment = async (data: PaymentForm) => {
     if (!invoice || !user) return
     setSavingPayment(true)
-    await supabase.from('payments').insert({
+    setActionError('')
+    const { error: payErr } = await supabase.from('payments').insert({
       invoice_id: invoice.id,
       amount: data.amount,
       payment_date: data.payment_date,
@@ -189,8 +194,12 @@ export default function InvoiceDetailPage() {
       notes: data.notes || null,
       created_by: user.id,
     })
-    const newPaid = totalPaid + data.amount
-    const newStatus = newPaid >= Number(invoice.total) ? 'paid' : 'partial'
+    if (payErr) { setActionError(payErr.message); setSavingPayment(false); return }
+    // Recompute the paid total from the DB instead of trusting client state, so a
+    // stale page or a concurrent payment can't push the status to the wrong value.
+    const { data: payRows } = await supabase.from('payments').select('amount').eq('invoice_id', invoice.id)
+    const paidSum = ((payRows ?? []) as Array<Pick<Payment, 'amount'>>).reduce((s, p) => s + Number(p.amount), 0)
+    const newStatus = paidSum >= Number(invoice.total) ? 'paid' : 'partial'
     await supabase.from('invoices').update({ status: newStatus }).eq('id', invoice.id)
     setPaymentOpen(false)
     reset()
@@ -215,20 +224,22 @@ export default function InvoiceDetailPage() {
   const voidInvoice = async () => {
     if (!invoice) return
     setVoiding(true)
+    setActionError('')
     const res = await voidInvoiceAction({ id: invoice.id, reason: voidReason })
     setVoiding(false)
+    if (!res.ok) { setActionError(res.error); return }
     setVoidOpen(false)
     setVoidReason('')
-    if (!res.ok) { alert(res.error); return }
     load()
   }
 
   const restore = async () => {
     if (!invoice) return
     setRestoring(true)
+    setActionError('')
     const res = await restoreInvoice({ id: invoice.id })
     setRestoring(false)
-    if (!res.ok) { alert(res.error); return }
+    if (!res.ok) { setActionError(res.error); return }
     load()
   }
 
@@ -524,7 +535,7 @@ export default function InvoiceDetailPage() {
                   </tr>
                   <tr>
                     <td colSpan={3} className="pt-1 text-right font-semibold text-gray-700">Balance Due</td>
-                    <td className="pt-1 text-right font-bold text-red-600">{formatCurrency(previewTotal - totalPaid)}</td>
+                    <td className="pt-1 text-right font-bold text-red-600">{formatCurrency(invoice.status === 'paid' ? 0 : previewTotal - totalPaid)}</td>
                   </tr>
                 </>
               )}
@@ -578,7 +589,9 @@ export default function InvoiceDetailPage() {
   // Content editing (Edit form, recipient, patient/doctor) is gated by status + role.
   // Workflow actions (payments, mark sent/paid, void, print) are unaffected.
   const voided = isVoided(invoice)
-  const canEdit = canEditInvoice(invoice, role)
+  const canEdit = canEditInvoice(invoice, hasPermission)
+  // Overdue is derived (outstanding + past due), never a stored status value.
+  const overdue = !voided && isOverdue(invoice, todayISODate())
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -591,14 +604,16 @@ export default function InvoiceDetailPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">{invoice.invoice_number}</h1>
-              <Badge variant={STATUS_VARIANT[invoice.status] ?? 'secondary'} className="capitalize">{invoice.status}</Badge>
+              {overdue
+                ? <Badge variant="destructive" className="capitalize">Overdue</Badge>
+                : <Badge variant={STATUS_VARIANT[invoice.status] ?? 'secondary'} className="capitalize">{invoice.status}</Badge>}
               {voided && (
                 <Badge variant="destructive" className="uppercase">Voided</Badge>
               )}
               {!voided && !canEdit && (
                 <span
                   className="inline-flex items-center gap-1 text-xs text-gray-500"
-                  title="This invoice has been sent. Only an admin can edit it."
+                  title="This invoice has been sent. You don't have permission to edit it."
                 >
                   <Lock className="h-3 w-3" />Locked
                 </span>
@@ -615,7 +630,7 @@ export default function InvoiceDetailPage() {
           )}
           {!voided && ['sent', 'partial', 'overdue'].includes(invoice.status) && (
             <>
-              <Button variant="outline" size="sm" onClick={() => { reset({ payment_date: new Date().toISOString().split('T')[0], amount: outstanding > 0 ? outstanding : undefined }); setPaymentOpen(true) }}>
+              <Button variant="outline" size="sm" onClick={() => { setActionError(''); reset({ payment_date: todayISODate(), amount: outstanding > 0 ? outstanding : undefined }); setPaymentOpen(true) }}>
                 <CreditCard className="h-4 w-4 mr-2" />Record Payment
               </Button>
               <Button variant="outline" size="sm" onClick={markAsPaid} disabled={markingPaid}>
@@ -636,22 +651,25 @@ export default function InvoiceDetailPage() {
           <Button variant="outline" size="sm" onClick={() => openPrintDialog('delivery')}>
             <Printer className="h-4 w-4 mr-2" />Print Delivery
           </Button>
-          {isAdmin && !voided && (
+          {hasPermission('voidInvoice') && !voided && (
             <Button
               variant="outline"
               size="sm"
               className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
-              onClick={() => setVoidOpen(true)}
+              onClick={() => { setActionError(''); setVoidOpen(true) }}
             >
               <Ban className="h-4 w-4 mr-2" />Void
             </Button>
           )}
-          {isAdmin && voided && (
+          {hasPermission('voidInvoice') && voided && (
             <Button variant="outline" size="sm" onClick={restore} disabled={restoring}>
               {restoring ? 'Restoring…' : 'Restore'}
             </Button>
           )}
         </div>
+        {actionError && (
+          <p className="text-sm text-destructive">{actionError}</p>
+        )}
       </div>
 
       {/* Invoice document — also used for printing */}
@@ -1028,9 +1046,9 @@ export default function InvoiceDetailPage() {
                                 className="h-8 text-sm text-right tabular-nums"
                                 type="number"
                                 step="1"
-                                min="0"
-                                value={ov?.quantity ?? 0}
-                                onChange={e => updateItem({ quantity: Number(e.target.value) || 0 })}
+                                min="1"
+                                value={ov?.quantity ?? 1}
+                                onChange={e => updateItem({ quantity: Math.max(1, Math.floor(parseFloat(e.target.value) || 1)) })}
                               />
                               {dialogMode === 'invoice' && (
                                 <Input
@@ -1168,6 +1186,7 @@ export default function InvoiceDetailPage() {
             <Label>Reason (optional)</Label>
             <Input value={voidReason} onChange={e => setVoidReason(e.target.value)} placeholder="e.g. duplicate, entry error" />
           </div>
+          {actionError && <p className="text-sm text-destructive">{actionError}</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setVoidOpen(false)}>Cancel</Button>
             <Button
@@ -1190,6 +1209,11 @@ export default function InvoiceDetailPage() {
               <Label>Amount (MYR) *</Label>
               <Input type="number" min="0.01" step="0.01" {...register('amount')} />
               {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
+              {!errors.amount && outstanding > 0 && Number(watch('amount')) > outstanding && (
+                <p className="text-xs text-amber-600">
+                  Exceeds the outstanding balance of {formatCurrency(outstanding)}.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Payment Date *</Label>
@@ -1203,6 +1227,7 @@ export default function InvoiceDetailPage() {
               <Label>Notes</Label>
               <Textarea rows={2} placeholder="Optional notes…" {...register('notes')} />
             </div>
+            {actionError && <p className="text-sm text-destructive">{actionError}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setPaymentOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={savingPayment}>{savingPayment ? 'Saving…' : 'Record Payment'}</Button>
