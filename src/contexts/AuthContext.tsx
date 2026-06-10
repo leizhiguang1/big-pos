@@ -1,61 +1,89 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
+import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import type { Permission } from '@/lib/permissions'
 
 interface AuthContextType {
   session: Session | null
-  user: User | null
+  user: Session['user'] | null
   username: string
-  role: string
-  isAdmin: boolean
+  roleName: string
+  isSuperadmin: boolean
+  hasPermission: (permission: Permission) => boolean
   loading: boolean
   signOut: () => Promise<void>
 }
+
+const noPerms = () => false
 
 const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   username: '',
-  role: 'staff',
-  isAdmin: false,
+  roleName: '',
+  isSuperadmin: false,
+  hasPermission: noPerms,
   loading: true,
   signOut: async () => {},
 })
 
+type RoleInfo = { name: string; isSuperadmin: boolean; permissions: Set<string> }
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
+  const [role, setRole] = useState<RoleInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setLoading(false)
-    })
+    let active = true
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
+    const loadRole = async (userId: string): Promise<RoleInfo | null> => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('roles(name, is_system, role_permissions(permission))')
+        .eq('id', userId)
+        .single()
+      const r = (data as { roles?: { name: string; is_system: boolean; role_permissions: { permission: string }[] } | null } | null)?.roles
+      if (!r) return null
+      return { name: r.name, isSuperadmin: r.is_system, permissions: new Set(r.role_permissions.map(p => p.permission)) }
+    }
 
-    return () => subscription.unsubscribe()
+    const apply = async (s: Session | null) => {
+      setSession(s)
+      if (s?.user) {
+        const info = await loadRole(s.user.id)
+        if (active) setRole(info)
+      } else if (active) {
+        setRole(null)
+      }
+      if (active) setLoading(false)
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => apply(session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { apply(session) })
+
+    return () => { active = false; subscription.unsubscribe() }
   }, [])
 
-  const signOut = async () => {
-    await supabase.auth.signOut()
-  }
+  const signOut = async () => { await supabase.auth.signOut() }
 
   const username: string = session?.user?.user_metadata?.username ?? ''
-  // Authoritative role lives in app_metadata (only the service role can set it);
-  // fall back to user_metadata for sessions issued before that move.
-  const role: string =
-    (session?.user?.app_metadata?.role as string | undefined) ??
-    session?.user?.user_metadata?.role ??
-    'staff'
-  const isAdmin = role === 'admin'
+  const isSuperadmin = role?.isSuperadmin ?? false
+  const hasPermission = (permission: Permission) => isSuperadmin || (role?.permissions.has(permission) ?? false)
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, username, role, isAdmin, loading, signOut }}>
+    <AuthContext.Provider value={{
+      session,
+      user: session?.user ?? null,
+      username,
+      roleName: role?.name ?? '',
+      isSuperadmin,
+      hasPermission,
+      loading,
+      signOut,
+    }}>
       {children}
     </AuthContext.Provider>
   )
