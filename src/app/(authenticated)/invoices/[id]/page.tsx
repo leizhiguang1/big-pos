@@ -23,12 +23,15 @@ import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight, Pencil,
 import { canEditInvoice } from '@/lib/invoice-permissions'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
 import { voidInvoice as voidInvoiceAction, restoreInvoice } from '@/lib/invoices/void-actions'
-import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStatus, ServiceStatus, Product } from '@/lib/database.types'
+import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStage, ServiceStatus, Product } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
 import { cn } from '@/lib/utils'
-import { WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_COLORS } from '@/lib/work-status'
 import { WorkStatusBadge } from '@/components/work-status-badge'
 import { fetchActiveServiceStatuses, DEFAULT_COLOR } from '@/lib/service-status'
+import {
+  fetchWorkStages, encodeWork, decodeWork, workOptionsForItem,
+  workLabel, workColor,
+} from '@/lib/work-stages'
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
   draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive',
@@ -84,6 +87,7 @@ export default function InvoiceDetailPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [payments, setPayments] = useState<Payment[]>([])
   const [history, setHistory] = useState<InvoiceItemStatusHistory[]>([])
+  const [stages, setStages] = useState<WorkStage[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [paymentOpen, setPaymentOpen] = useState(false)
@@ -119,13 +123,15 @@ export default function InvoiceDetailPage() {
 
   const load = async () => {
     if (!id) return
-    const [invRes, itemsRes, paymentsRes, ssRes, prodRes] = await Promise.all([
+    const [invRes, itemsRes, paymentsRes, ssRes, prodRes, stageRows] = await Promise.all([
       supabase.from('invoices').select('*, customers(*), service_statuses(*)').eq('id', id).single(),
       supabase.from('invoice_items').select('*').eq('invoice_id', id).order('created_at'),
       supabase.from('payments').select('*').eq('invoice_id', id).order('payment_date'),
       fetchActiveServiceStatuses(),
       supabase.from('products').select('*').eq('active', true).order('created_at'),
+      fetchWorkStages(),
     ])
+    setStages(stageRows)
     setProducts(prodRes.data ?? [])
     if (invRes.data) {
       const inv = invRes.data as Invoice
@@ -152,8 +158,10 @@ export default function InvoiceDetailPage() {
     setLoading(false)
   }
 
-  const updateWorkStatus = async (itemId: string, status: WorkStatus) => {
-    await supabase.from('invoice_items').update({ work_status: status }).eq('id', itemId)
+  const updateWorkStatus = async (itemId: string, value: string) => {
+    const { work_status, stage_id } = decodeWork(value)
+    // The DB trigger logs history + stamps the timestamp; we only write the change.
+    await supabase.from('invoice_items').update({ work_status, stage_id }).eq('id', itemId)
     load()
   }
 
@@ -593,6 +601,8 @@ export default function InvoiceDetailPage() {
   // Overdue is derived (outstanding + past due), never a stored status value.
   const overdue = !voided && isOverdue(invoice, todayISODate())
 
+  const stagesById = new Map(stages.map(s => [s.id, s]))
+
   return (
     <div className="max-w-4xl space-y-6">
       {/* Actions bar — hidden on print */}
@@ -778,20 +788,20 @@ export default function InvoiceDetailPage() {
                     <TableCell className="font-medium">{item.description}</TableCell>
                     <TableCell>
                       <Select
-                        value={item.work_status}
-                        onValueChange={v => updateWorkStatus(item.id, v as WorkStatus)}
+                        value={encodeWork(item.work_status, item.stage_id)}
+                        onValueChange={v => updateWorkStatus(item.id, v)}
                       >
                         <SelectTrigger
                           className={cn(
-                            'h-8 w-36 text-xs font-medium border-transparent',
-                            WORK_STATUS_COLORS[item.work_status]
+                            'h-8 w-44 text-xs font-medium border-transparent',
+                            workColor(item.work_status, item.stage_id, stagesById)
                           )}
                         >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {WORK_STATUSES.map(s => (
-                            <SelectItem key={s} value={s}>{WORK_STATUS_LABELS[s]}</SelectItem>
+                          {workOptionsForItem(stages.filter(s => s.is_active), item.work_status, item.stage_id, stagesById).map(o => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -834,7 +844,16 @@ export default function InvoiceDetailPage() {
                               </TableCell>
                               <TableCell className="text-sm">{item?.description ?? '—'}</TableCell>
                               <TableCell>
-                                <WorkStatusBadge status={h.status} />
+                                {h.status === 'in_progress' && h.stage_id ? (
+                                  <span className={cn(
+                                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap',
+                                    workColor(h.status, h.stage_id, stagesById),
+                                  )}>
+                                    {workLabel(h.status, h.stage_id, stagesById)}
+                                  </span>
+                                ) : (
+                                  <WorkStatusBadge status={h.status} />
+                                )}
                               </TableCell>
                               <TableCell className="text-sm text-gray-600">
                                 {h.changed_by_name ?? '—'}
