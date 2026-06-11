@@ -22,7 +22,10 @@
 - History rows are written **by the DB trigger**, not by app code. App code must therefore **never** insert history manually — it only updates `invoice_items`, and the trigger logs.
 - `service_statuses` columns to clone: `id uuid PK default gen_random_uuid()`, `label text NOT NULL`, `color text NULL`, `sort_order int NOT NULL default 0`, `is_active bool NOT NULL default true`, `created_at timestamptz NOT NULL default now()`. RLS **enabled**, single policy `authenticated_all` = `FOR ALL TO authenticated USING (true) WITH CHECK (true)`.
 - `database.types.ts` is **hand-maintained** (not auto-generated in this repo) — edit it by hand.
-- **`npx tsc --noEmit` is NOT a valid gate for this repo.** `next.config` sets `typescript: { ignoreBuildErrors: true }` on purpose — the hand-rolled types fail Supabase's `GenericSchema` constraint, so every `supabase.from()` table op resolves to `never` and `tsc` reports ~50 baseline errors that are not real bugs. Use **`npm run lint`** (catches unused imports / real lint issues), **`npm run build`** (compiles routes; type errors ignored), and **`npm test`** (vitest, transpile-only) as the gates. Do not block on `tsc` output.
+- **Only two gates work in this repo: `npm run build` and `npm test`.** Specifically:
+  - `npx tsc --noEmit` is NOT a gate — `next.config` sets `typescript: { ignoreBuildErrors: true }` because the hand-rolled types fail Supabase's `GenericSchema` constraint, so every `supabase.from()` op resolves to `never` and `tsc` reports ~50 baseline errors that are not real bugs.
+  - `npm run lint` is BROKEN — this is Next.js 16, which removed `next lint`; there is also no ESLint config, so `npx eslint` errors too. There is **no working linter and no `noUnusedLocals`**, so unused imports are NOT auto-detected. When a task removes imports, **manually grep the changed file** to confirm every remaining imported symbol is still referenced (e.g. `grep -c '\bSymbol\b' file`), since nothing else will catch a dead import.
+  - **`npm run build`** (real compile gate; type errors ignored) and **`npm test`** (vitest) are the gates to run.
 
 ## File map
 
@@ -1343,10 +1346,11 @@ export default function WorkPage() {
 }
 ```
 
-- [ ] **Step 2: Lint + build** (NOT `tsc` — see Background facts; ~50 baseline `tsc` errors are expected and not real)
+- [ ] **Step 2: Build + dead-import grep** (no working linter/`tsc` — see Background facts)
 
-Run: `npm run lint`
-Expected: no new errors. (Pay attention to unused-import warnings — this rewrite drops `WORK_STATUS_COLORS` and `WorkStatusBadge`; make sure no dead imports remain.)
+This rewrite drops the `WORK_STATUS_COLORS` and `WorkStatusBadge` imports. Since nothing auto-detects dead imports, grep to confirm every symbol still imported is used at least twice (the import line + ≥1 use):
+Run: `for s in WORK_STATUSES WORK_STATUS_LABELS WORK_STATUS_FILLED WORK_STATUS_OUTLINED fetchWorkStages encodeWork decodeWork workOptionsForItem labelForValue colorForValue orderedGroupKeys; do echo "$s: $(grep -c "\b$s\b" "src/app/(authenticated)/work/page.tsx")"; done`
+Expected: every count ≥ 2. Also confirm `WORK_STATUS_COLORS` and `WorkStatusBadge` are GONE: `grep -nE "WORK_STATUS_COLORS|WorkStatusBadge" "src/app/(authenticated)/work/page.tsx"` → no matches.
 
 Run: `npm run build`
 Expected: build succeeds (the `/work` route compiles).
@@ -1535,10 +1539,11 @@ Replace with:
                               </TableCell>
 ```
 
-- [ ] **Step 8: Lint + build** (NOT `tsc` — see Background facts; ~50 baseline `tsc` errors are expected and not real)
+- [ ] **Step 8: Build + dead-import grep** (no working linter/`tsc` — see Background facts)
 
-Run: `npm run lint`
-Expected: no new errors. Imports were corrected in Step 1, so there should be no unused-import warnings. If lint flags an unused symbol from `@/lib/work-status`, delete it — the page resolves all labels/colors through the `work-stages` helpers now.
+Step 1 removed `WORK_STATUSES`, `WORK_STATUS_LABELS`, `WORK_STATUS_COLORS`, and the `WorkStatus` type from this file's imports. Confirm none of them remain referenced (a leftover reference means you removed an import that's still used → restore it; a leftover import with no use → delete it):
+Run: `grep -nE "\b(WORK_STATUSES|WORK_STATUS_LABELS|WORK_STATUS_COLORS)\b|: WorkStatus\b|as WorkStatus\b" "src/app/(authenticated)/invoices/[id]/page.tsx"`
+Expected: no matches. Then confirm the new helper imports are all used: `for s in fetchWorkStages encodeWork decodeWork workOptionsForItem workLabel workColor WorkStage; do echo "$s: $(grep -c "\b$s\b" "src/app/(authenticated)/invoices/[id]/page.tsx")"; done` → every count ≥ 2.
 
 Run: `npm run build`
 Expected: build succeeds.
@@ -1565,10 +1570,13 @@ git commit -m "feat(work-stages): invoice detail stage dropdown + stage in work 
 Run: `npm test`
 Expected: all tests pass, including `work-stages.test.ts` and `work-status.test.ts`.
 
-- [ ] **Step 2: Lint + build** (NOT `tsc` — see Background facts; ~50 baseline `tsc` errors are expected and not real)
+- [ ] **Step 2: Test + build** (no working linter/`tsc` — see Background facts)
 
-Run: `npm run lint && npm run build`
-Expected: both pass.
+Run: `npm test`
+Expected: all vitest tests pass (work-stages + work-status suites).
+
+Run: `npm run build`
+Expected: build succeeds.
 
 - [ ] **Step 3: Grep for stragglers**
 
