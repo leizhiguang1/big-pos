@@ -10,16 +10,20 @@ import {
 } from '@/components/ui/select'
 import { Search, ChevronRight, ChevronDown, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { WorkStatus } from '@/lib/database.types'
+import type { WorkStatus, WorkStage } from '@/lib/database.types'
 import {
-  WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_COLORS, WORK_STATUS_FILLED, WORK_STATUS_OUTLINED,
+  WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_FILLED, WORK_STATUS_OUTLINED,
 } from '@/lib/work-status'
-import { WorkStatusBadge } from '@/components/work-status-badge'
+import {
+  fetchWorkStages, encodeWork, decodeWork, workOptionsForItem,
+  labelForValue, colorForValue, orderedGroupKeys,
+} from '@/lib/work-stages'
 
 type Row = {
   id: string
   description: string
   work_status: WorkStatus
+  stage_id: string | null
   work_status_updated_at: string
   invoices: {
     id: string
@@ -57,42 +61,66 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString()
 }
 
+// A small pill used for group headers and the "moved to" hint, colored by slot.
+function SlotBadge({ value, stagesById, className }: {
+  value: string
+  stagesById: Map<string, WorkStage>
+  className?: string
+}) {
+  return (
+    <span className={cn(
+      'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap',
+      colorForValue(value, stagesById),
+      className,
+    )}>
+      {labelForValue(value, stagesById)}
+    </span>
+  )
+}
+
 export default function WorkPage() {
   const [rows, setRows] = useState<Row[]>([])
+  const [stages, setStages] = useState<WorkStage[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterMode>('active')
   const [search, setSearch] = useState('')
-  const [collapsed, setCollapsed] = useState<Set<WorkStatus>>(new Set())
-  // Items recently changed → shown briefly with a "moved to X" hint even if
-  // they no longer match the current filter. Cleared after MOVE_HINT_MS.
-  const [recentlyMoved, setRecentlyMoved] = useState<Map<string, WorkStatus>>(new Map())
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // Items recently changed → shown briefly with a "moved to X" hint even if they
+  // no longer match the current filter. Maps item id → new slot value. Cleared
+  // after MOVE_HINT_MS.
+  const [recentlyMoved, setRecentlyMoved] = useState<Map<string, string>>(new Map())
 
   const load = async () => {
-    const { data } = await supabase
-      .from('invoice_items')
-      .select('id, description, work_status, work_status_updated_at, invoices(id, invoice_number, status, voided_at, customers(clinic_name))')
-      .order('work_status_updated_at', { ascending: false })
-      .order('id', { ascending: true })
+    const [{ data }, stageRows] = await Promise.all([
+      supabase
+        .from('invoice_items')
+        .select('id, description, work_status, stage_id, work_status_updated_at, invoices(id, invoice_number, status, voided_at, customers(clinic_name))')
+        .order('work_status_updated_at', { ascending: false })
+        .order('id', { ascending: true }),
+      fetchWorkStages(),
+    ])
     const items = ((data ?? []) as unknown as Row[]).filter(r => r.invoices && r.invoices.voided_at == null)
     setRows(items)
+    setStages(stageRows)
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
+  const allStagesById = useMemo(() => new Map(stages.map(s => [s.id, s])), [stages])
+  const activeStages = useMemo(() => stages.filter(s => s.is_active), [stages])
+
   // Optimistic local updates — no refetch, so the row stays put visually.
-  const updateStatus = async (id: string, status: WorkStatus) => {
+  const updateStatus = async (id: string, value: string) => {
+    const { work_status, stage_id } = decodeWork(value)
     setRows(prev => prev.map(r =>
       r.id === id
-        ? { ...r, work_status: status, work_status_updated_at: new Date().toISOString() }
+        ? { ...r, work_status, stage_id, work_status_updated_at: new Date().toISOString() }
         : r
     ))
-    // Mark the row as "recently moved" so it stays visible under whatever
-    // filter is active for a few seconds — confirms the change happened
-    // even if the new status doesn't match the current filter.
     setRecentlyMoved(prev => {
       const n = new Map(prev)
-      n.set(id, status)
+      n.set(id, value)
       return n
     })
     setTimeout(() => {
@@ -103,22 +131,23 @@ export default function WorkPage() {
         return n
       })
     }, MOVE_HINT_MS)
-    await supabase.from('invoice_items').update({ work_status: status }).eq('id', id)
+    // The DB trigger logs history + stamps the timestamp; we only write the change.
+    await supabase.from('invoice_items').update({ work_status, stage_id }).eq('id', id)
   }
 
-  const toggleCollapsed = (s: WorkStatus) => {
+  const toggleCollapsed = (key: string) => {
     setCollapsed(prev => {
       const n = new Set(prev)
-      if (n.has(s)) n.delete(s)
-      else n.add(s)
+      if (n.has(key)) n.delete(key)
+      else n.add(key)
       return n
     })
   }
 
-  // counts across all rows (so chips don't disappear when filtered)
+  // counts across all rows, per phase (chips stay phase-level)
   const counts = useMemo(() => {
     const c: Record<WorkStatus, number> = {
-      received: 0, in_progress: 0, qc: 0, ready: 0, delivered: 0, on_hold: 0,
+      received: 0, in_progress: 0, ready: 0, delivered: 0, on_hold: 0,
     }
     for (const r of rows) c[r.work_status]++
     return c
@@ -147,21 +176,18 @@ export default function WorkPage() {
     })
   }, [rows, filter, search, recentlyMoved])
 
-  // Group recently-moved rows under the stage they were moved FROM (current
-  // filter) so they stay where the user expects, instead of jumping to a new
-  // group and disappearing again.
+  // Group items by their encoded slot (received / stage:<id> / in_progress / ready / …),
+  // ordered canonically with any inactive-stage groups slotted into the In-Progress region.
   const grouped = useMemo(() => {
-    const g = new Map<WorkStatus, Row[]>()
+    const g = new Map<string, Row[]>()
     for (const r of visible) {
-      const groupKey: WorkStatus =
-        recentlyMoved.has(r.id) && filter !== 'all' && filter !== 'active' && WORK_STATUSES.includes(filter as WorkStatus)
-          ? (filter as WorkStatus)
-          : r.work_status
-      if (!g.has(groupKey)) g.set(groupKey, [])
-      g.get(groupKey)!.push(r)
+      const key = encodeWork(r.work_status, r.stage_id)
+      if (!g.has(key)) g.set(key, [])
+      g.get(key)!.push(r)
     }
-    return WORK_STATUSES.filter(s => g.has(s)).map(s => ({ status: s, items: g.get(s)! }))
-  }, [visible, recentlyMoved, filter])
+    const order = orderedGroupKeys(activeStages, [...g.keys()])
+    return order.map(key => ({ key, items: g.get(key)! }))
+  }, [visible, activeStages])
 
   const chips: Array<{ key: FilterMode; label: string; count: number }> = [
     { key: 'active', label: 'Active', count: activeCount },
@@ -225,17 +251,17 @@ export default function WorkPage() {
 
       <div className="space-y-4">
         {grouped.map(group => {
-          const isCollapsed = collapsed.has(group.status)
+          const isCollapsed = collapsed.has(group.key)
           return (
-            <Card key={group.status} className="overflow-hidden">
+            <Card key={group.key} className="overflow-hidden">
               <button
                 type="button"
-                onClick={() => toggleCollapsed(group.status)}
+                onClick={() => toggleCollapsed(group.key)}
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 border-b"
               >
                 <div className="flex items-center gap-3">
                   {isCollapsed ? <ChevronRight className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                  <WorkStatusBadge status={group.status} />
+                  <SlotBadge value={group.key} stagesById={allStagesById} />
                   <span className="text-sm text-gray-500">{group.items.length} item{group.items.length === 1 ? '' : 's'}</span>
                 </div>
               </button>
@@ -244,6 +270,8 @@ export default function WorkPage() {
                   {group.items.map(row => {
                     const movedTo = recentlyMoved.get(row.id)
                     const isMoved = movedTo !== undefined
+                    const currentValue = encodeWork(row.work_status, row.stage_id)
+                    const options = workOptionsForItem(activeStages, row.work_status, row.stage_id, allStagesById)
                     return (
                       <div
                         key={row.id}
@@ -268,25 +296,25 @@ export default function WorkPage() {
                           <div className="text-sm text-gray-900 truncate">{row.description}</div>
                           {isMoved ? (
                             <div className="text-xs text-green-700 mt-0.5 flex items-center gap-1">
-                              <Check className="h-3 w-3" /> Moved to <WorkStatusBadge status={movedTo} className="ml-0.5" />
+                              <Check className="h-3 w-3" /> Moved to <SlotBadge value={movedTo!} stagesById={allStagesById} className="ml-0.5" />
                             </div>
                           ) : (
                             <div className="text-xs text-gray-400 mt-0.5">{relativeTime(row.work_status_updated_at)}</div>
                           )}
                         </div>
 
-                        <Select value={row.work_status} onValueChange={v => updateStatus(row.id, v as WorkStatus)}>
+                        <Select value={currentValue} onValueChange={v => updateStatus(row.id, v)}>
                           <SelectTrigger
                             className={cn(
                               'h-8 w-40 text-xs font-medium border-transparent',
-                              WORK_STATUS_COLORS[row.work_status]
+                              colorForValue(currentValue, allStagesById)
                             )}
                           >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {WORK_STATUSES.map(s => (
-                              <SelectItem key={s} value={s}>{WORK_STATUS_LABELS[s]}</SelectItem>
+                            {options.map(o => (
+                              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
