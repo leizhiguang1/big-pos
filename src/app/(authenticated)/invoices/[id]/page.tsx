@@ -21,7 +21,7 @@ import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate, todayISODate } from '@/lib/utils'
 import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight, Pencil, Lock } from 'lucide-react'
 import { canEditInvoice } from '@/lib/invoice-permissions'
-import { isVoided, isOverdue } from '@/lib/invoice-status'
+import { isVoided, isOverdue, nextStatusAfterPayment } from '@/lib/invoice-status'
 import { voidInvoice as voidInvoiceAction, restoreInvoice } from '@/lib/invoices/void-actions'
 import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStage, ServiceStatus, Product } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
@@ -189,6 +189,11 @@ export default function InvoiceDetailPage() {
   // When an invoice is settled (status 'paid'), the balance is zero even if the
   // recorded payments don't sum to the total — e.g. it was marked paid directly.
   const outstanding = invoice ? (invoice.status === 'paid' ? 0 : Number(invoice.total) - totalPaid) : 0
+  // Amount to pre-fill in Record Payment. Unlike `outstanding`, this stays the
+  // real unrecorded balance for a 'paid' invoice settled via the shortcut (no
+  // payment rows) — there the full total is still unbacked. Without this the
+  // field opens blank and the required-amount rule blocks the save.
+  const unrecorded = invoice ? Math.max(0, Number(invoice.total) - totalPaid) : 0
 
   const onRecordPayment = async (data: PaymentForm) => {
     if (!invoice || !user) return
@@ -207,7 +212,9 @@ export default function InvoiceDetailPage() {
     // stale page or a concurrent payment can't push the status to the wrong value.
     const { data: payRows } = await supabase.from('payments').select('amount').eq('invoice_id', invoice.id)
     const paidSum = ((payRows ?? []) as Array<Pick<Payment, 'amount'>>).reduce((s, p) => s + Number(p.amount), 0)
-    const newStatus = paidSum >= Number(invoice.total) ? 'paid' : 'partial'
+    // Recording a payment never downgrades an invoice that's already settled —
+    // e.g. one marked paid via the shortcut, where you log the bank reference later.
+    const newStatus = nextStatusAfterPayment(invoice.status, paidSum, Number(invoice.total))
     await supabase.from('invoices').update({ status: newStatus }).eq('id', invoice.id)
     setPaymentOpen(false)
     reset()
@@ -638,15 +645,18 @@ export default function InvoiceDetailPage() {
           {!voided && invoice.status === 'draft' && (
             <Button variant="outline" size="sm" onClick={markAsSent}>Mark as Sent</Button>
           )}
+          {/* Record Payment stays available once an invoice is sent — including
+              after it's paid — so you can always log the actual bank reference. */}
+          {!voided && ['sent', 'partial', 'overdue', 'paid'].includes(invoice.status) && (
+            <Button variant="outline" size="sm" onClick={() => { setActionError(''); reset({ payment_date: todayISODate(), amount: unrecorded > 0 ? unrecorded : undefined }); setPaymentOpen(true) }}>
+              <CreditCard className="h-4 w-4 mr-2" />Record Payment
+            </Button>
+          )}
+          {/* Mark Paid is a shortcut to settle — only meaningful while still unpaid. */}
           {!voided && ['sent', 'partial', 'overdue'].includes(invoice.status) && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => { setActionError(''); reset({ payment_date: todayISODate(), amount: outstanding > 0 ? outstanding : undefined }); setPaymentOpen(true) }}>
-                <CreditCard className="h-4 w-4 mr-2" />Record Payment
-              </Button>
-              <Button variant="outline" size="sm" onClick={markAsPaid} disabled={markingPaid}>
-                <CheckCircle className="h-4 w-4 mr-2" />Mark Paid
-              </Button>
-            </>
+            <Button variant="outline" size="sm" onClick={markAsPaid} disabled={markingPaid}>
+              <CheckCircle className="h-4 w-4 mr-2" />Mark Paid
+            </Button>
           )}
           {canEdit && (
             <Button variant="outline" size="sm" asChild>

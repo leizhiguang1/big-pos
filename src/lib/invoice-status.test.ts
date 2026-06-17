@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isVoided, countsAsRevenue, isOutstanding, isOverdue } from './invoice-status'
+import { isVoided, countsAsRevenue, isOutstanding, isOverdue, nextStatusAfterPayment } from './invoice-status'
 
 const inv = (status: string, voided_at: string | null = null) =>
   ({ status, voided_at } as any)
@@ -38,6 +38,24 @@ describe('isOutstanding', () => {
   it('excludes draft and paid', () => {
     expect(isOutstanding(inv('draft'))).toBe(false)
     expect(isOutstanding(inv('paid'))).toBe(false)
+  })
+})
+
+describe('nextStatusAfterPayment', () => {
+  it('becomes paid when recorded payments cover the total', () => {
+    expect(nextStatusAfterPayment('sent', 100, 100)).toBe('paid')
+    expect(nextStatusAfterPayment('partial', 120, 100)).toBe('paid')
+  })
+  it('becomes partial when payments fall short', () => {
+    expect(nextStatusAfterPayment('sent', 40, 100)).toBe('partial')
+    expect(nextStatusAfterPayment('overdue', 0, 100)).toBe('partial')
+  })
+  it('never downgrades an already-paid invoice, even if recorded payments are short', () => {
+    // e.g. invoice was settled via "Mark Paid" with no payment rows, then a
+    // partial bank reference is logged after the fact — it must stay paid.
+    expect(nextStatusAfterPayment('paid', 0, 100)).toBe('paid')
+    expect(nextStatusAfterPayment('paid', 30, 100)).toBe('paid')
+    expect(nextStatusAfterPayment('paid', 100, 100)).toBe('paid')
   })
 })
 

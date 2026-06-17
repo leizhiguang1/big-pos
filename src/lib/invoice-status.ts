@@ -18,6 +18,21 @@ export const isOutstanding = (inv: CountFields): boolean =>
   !isVoided(inv) && (OUTSTANDING_STATUSES as readonly string[]).includes(inv.status)
 
 /**
+ * The status to write after recording a payment. `paidSum` is the total of all
+ * recorded payment rows; `total` is the invoice total. A fully-covered invoice
+ * becomes 'paid', otherwise 'partial'. An invoice already settled (status
+ * 'paid' — e.g. via the "Mark Paid" shortcut, which records no payment rows)
+ * is never downgraded: logging a later bank reference must not flip it back to
+ * partial.
+ */
+export const nextStatusAfterPayment = (
+  current: string,
+  paidSum: number,
+  total: number,
+): 'paid' | 'partial' =>
+  current === 'paid' || paidSum >= total ? 'paid' : 'partial'
+
+/**
  * Overdue is derived, not stored: an outstanding invoice whose due date has
  * passed. `today` is a local `yyyy-MM-dd` string (see `todayISODate`); string
  * comparison is valid for that fixed-width format.

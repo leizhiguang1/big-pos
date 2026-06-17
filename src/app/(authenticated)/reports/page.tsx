@@ -60,6 +60,12 @@ export default function ReportsPage() {
     })
     .sort((a, b) => b.daysOverdue - a.daysOverdue)
 
+  // Paid invoices — settled bills are no longer outstanding, so this is the only
+  // place in Reports they show up. Newest first (invoice_date sorts lexically).
+  const paid = active
+    .filter(i => i.status === 'paid')
+    .sort((a, b) => (a.invoice_date < b.invoice_date ? 1 : -1))
+
   // Sales by customer
   const byCustomer = Object.values(
     active.reduce((acc, inv) => {
@@ -123,6 +129,7 @@ export default function ReportsPage() {
       <Tabs defaultValue="outstanding">
         <TabsList>
           <TabsTrigger value="outstanding">Outstanding</TabsTrigger>
+          <TabsTrigger value="paid">Paid</TabsTrigger>
           <TabsTrigger value="customers">By Customer</TabsTrigger>
           <TabsTrigger value="products">By Product</TabsTrigger>
         </TabsList>
@@ -158,6 +165,39 @@ export default function ReportsPage() {
                           <span className="text-sm text-gray-400">Not due yet</span>
                         )}
                       </TableCell>
+                      <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="paid" className="mt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Paid Invoices</CardTitle></CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paid.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">No paid invoices in this period</TableCell></TableRow>}
+                  {paid.map(inv => (
+                    <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
+                      <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
+                      <TableCell>{(inv.customers as { clinic_name: string })?.clinic_name}</TableCell>
+                      <TableCell className="text-sm">{formatDate(inv.invoice_date)}</TableCell>
                       <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
                       <TableCell>
                         <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>
