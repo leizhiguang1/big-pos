@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, Plus, Pencil, Trash2, ShieldCheck } from 'lucide-react'
-import { PERMISSION_GROUPS, type Permission } from '@/lib/permissions'
+import { PERMISSION_GROUPS, type Permission } from '@/domain/permissions'
 import { createRole, updateRole, deleteRole } from '@/lib/auth/role-actions'
 import type { Role } from '@/lib/database.types'
 

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import type { Permission } from '@/lib/permissions'
+import type { Permission } from '@/domain/permissions'
 
 interface AuthContextType {
   session: Session | null

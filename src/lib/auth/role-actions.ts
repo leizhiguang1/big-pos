@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperadmin } from '@/lib/auth/require-permission'
-import { PERMISSIONS } from '@/lib/permissions'
+import { PERMISSIONS } from '@/domain/permissions'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 

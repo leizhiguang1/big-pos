@@ -12,7 +12,7 @@
 import type { Database, Tables } from './database-generated.types'
 
 export type { Database, Json, Tables, TablesInsert, TablesUpdate } from './database-generated.types'
-export type { Permission } from '@/lib/permissions'
+export type { Permission } from '@/domain/permissions'
 
 // --- Domain status types ---------------------------------------------------
 

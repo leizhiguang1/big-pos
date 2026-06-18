@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { permissionGranted } from '@/lib/permissions'
+import { permissionGranted } from '@/domain/permissions'
 
 export type PermissionCheck =
   | { ok: true; userId: string }

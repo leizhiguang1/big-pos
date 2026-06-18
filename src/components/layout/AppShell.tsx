@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/contexts/AuthContext'
-import type { Permission } from '@/lib/permissions'
+import type { Permission } from '@/domain/permissions'
 import { COMPANY } from '@/lib/config'
 import { cn } from '@/lib/utils'
 
