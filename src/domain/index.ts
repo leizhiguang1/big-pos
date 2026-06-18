@@ -2,6 +2,6 @@
 export * from './billing'
 export * from './production'
 export * from './money'
-// export * from './aggregation'
+export * from './aggregation'
 // export * from './schemas'
 // export * from './permissions'
