@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { isOverdue, nextStatusAfterPayment, canTransition, countsAsRevenue } from './billing'
 
-const inv = (o: Partial<any> = {}) => ({ status: 'sent', due_date: '2026-01-01', voided_at: null, ...o })
+type InvoiceFields = { status: string; due_date: string; voided_at: string | null }
+const inv = (o: Partial<InvoiceFields> = {}) => ({ status: 'sent', due_date: '2026-01-01', voided_at: null, ...o })
 
 describe('billing', () => {
   it('paid invoice never downgrades on payment', () =>
