@@ -110,6 +110,7 @@ export type Database = {
           invoice_id: string
           product_id: string | null
           quantity: number
+          resume_status: Database["public"]["Enums"]["work_status"] | null
           stage_id: string | null
           unit_price: number
           work_note: string | null
@@ -124,6 +125,7 @@ export type Database = {
           invoice_id: string
           product_id?: string | null
           quantity?: number
+          resume_status?: Database["public"]["Enums"]["work_status"] | null
           stage_id?: string | null
           unit_price?: number
           work_note?: string | null
@@ -138,6 +140,7 @@ export type Database = {
           invoice_id?: string
           product_id?: string | null
           quantity?: number
+          resume_status?: Database["public"]["Enums"]["work_status"] | null
           stage_id?: string | null
           unit_price?: number
           work_note?: string | null
@@ -494,6 +497,25 @@ export type Database = {
       }
       generate_invoice_number: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
+      mark_invoice_paid: {
+        Args: {
+          p_created_by: string
+          p_invoice_id: string
+          p_reference?: string
+        }
+        Returns: undefined
+      }
+      record_payment: {
+        Args: {
+          p_amount: number
+          p_created_by: string
+          p_invoice_id: string
+          p_notes?: string
+          p_payment_date?: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       update_invoice_with_items: {
         Args: { p_invoice: Json; p_invoice_id: string; p_items: Json }
         Returns: undefined

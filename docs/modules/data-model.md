@@ -41,7 +41,7 @@ The clinics you bill.
 ---
 
 ### `invoices`
-Order header. `status` is **plain text, not a DB enum** (default `'draft'`).
+Order header. `status` is **text guarded by a CHECK constraint** (default `'draft'`).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -51,7 +51,7 @@ Order header. `status` is **plain text, not a DB enum** (default `'draft'`).
 | `created_by` | uuid NOT NULL → `auth.users` | |
 | `invoice_date` | date | Defaults to today |
 | `due_date` | date NOT NULL | |
-| `status` | text NOT NULL | `'draft'` default; app treats as `BillingStatus` |
+| `status` | text NOT NULL | `'draft'` default; `invoices_status_check` allows `draft\|sent\|partial\|paid\|overdue`. `overdue` is derived-only — never stored |
 | `subtotal` | numeric NOT NULL | Equals `total` — no tax field |
 | `total` | numeric NOT NULL | |
 | `notes` | text | |
@@ -90,6 +90,7 @@ Order lines. Production state lives here.
 | `stage_id` | uuid → `work_stages` | Nullable; meaningful only when `work_status = 'in_progress'` |
 | `work_status_updated_at` | timestamptz NOT NULL | Stamped by `stamp_invoice_item_work_status_updated_at` trigger |
 | `work_note` | text | Free-text note on the current status |
+| `resume_status` | `work_status` enum | When `work_status = on_hold`, the status to resume to; null otherwise (added 2026-06-18) |
 | `created_at` | timestamptz | |
 
 ---
@@ -207,19 +208,21 @@ Values: `received`, `in_progress`, `ready`, `delivered`, `on_hold`
 
 The value `qc` was removed. The forward-only flow is `received → in_progress → ready → delivered`; `on_hold` is off-flow.
 
-### `invoices.status` (text, NOT a DB enum)
-The app treats it as `'draft' | 'sent' | 'partial' | 'paid' | 'overdue'`, but the column is plain text. There is no DB CHECK constraint today. Plan 2 will add one.
+### `invoices.status` (text + CHECK, NOT a Postgres enum)
+Plain text guarded by `invoices_status_check`: `status in ('draft','sent','partial','paid','overdue')`. **`overdue` is derived from `due_date` at read time and never stored** — the constraint permits it, but no code writes it (stored values are only `draft`/`sent`/`partial`/`paid`).
 
 ---
 
 ## Database functions and triggers
 
-All of these live **only on the live DB** — they are not yet captured in repo migrations. (Known issue #1.)
+These are captured in the baseline migration (`supabase/migrations/00000000000000_baseline_schema.sql`); the two payment RPCs were added 2026-06-18 in `20260618010200_payment_rpcs.sql`.
 
 | Object | Type | Purpose |
 |---|---|---|
 | `create_invoice_with_items(jsonb, jsonb)` | RPC | Insert invoice header + all line items in one transaction |
 | `update_invoice_with_items(uuid, jsonb, jsonb)` | RPC | Update header + insert/update/delete lines in one transaction |
+| `record_payment(uuid, numeric, uuid, date?, text?, text?)` | RPC | Insert a payment + atomically set `partial`/`paid` (never downgrades a paid invoice). Added 2026-06-18 |
+| `mark_invoice_paid(uuid, uuid, text?)` | RPC | Insert a balancing payment for the outstanding amount, then set `paid` — keeps `sum(payments)` reconciled with status. Added 2026-06-18 |
 | `generate_invoice_number()` | Function | Produces the sequential invoice number string |
 | `set_invoice_number_default()` | Trigger (BEFORE INSERT on `invoices`) | Assigns the invoice number server-side |
 | `enforce_invoice_item_price_range()` | Trigger (BEFORE INS/UPD on `invoice_items`) | Rejects a line price outside the product's min/max band |
@@ -239,7 +242,7 @@ RLS is **enabled on all 11 tables**.
 | 9 business tables (invoices, items, payments, customers, products, service_statuses, work_stages, invoice_item_status_history, profiles) | `authenticated_all` (`USING true / WITH CHECK true`) | Any logged-in user has full read+write; `anon` is denied |
 | `roles`, `role_permissions` | Authenticated SELECT only | Writes go via service-role (server actions) |
 
-This means authorization for business data is currently **UI-only** — `hasPermission()` hides controls but any authenticated user can write directly to the API. Deferring real enforcement to Plan 2 is an accepted risk for the current small trusted-staff deployment.
+This means authorization for business data is currently **UI-only** — `hasPermission()` hides controls but any authenticated user can write directly to the API. Deferring real enforcement to Spec 5 (security) is an accepted risk for the current small trusted-staff deployment.
 
 ---
 
@@ -248,7 +251,7 @@ This means authorization for business data is currently **UI-only** — `hasPerm
 ### Add a column
 Write a Supabase migration file (e.g. `supabase/migrations/<timestamp>_add_col.sql`), then regenerate TypeScript types:
 ```bash
-supabase gen types typescript --project-id <id> > src/lib/database-generated.types.ts
+supabase gen types typescript --linked --schema public > src/lib/database-generated.types.ts
 ```
 Update `src/lib/database.types.ts` aliases if the new column needs a named alias.
 
@@ -258,5 +261,5 @@ ALTER TYPE work_status ADD VALUE 'new_value';
 ```
 Then update `WorkStatus` and related helpers in `src/domain/production.ts`. See [work-status.md § How to change this](./work-status.md).
 
-### Capture existing DB functions as migrations
-Export each function/trigger body from the live DB and place it under `supabase/migrations/`. This is a pending task (known issue #1 in ARCHITECTURE.md §8).
+### Add a database function / RPC
+Write a migration under `supabase/migrations/` (`language plpgsql`, `set search_path to 'public'`, not SECURITY DEFINER — match the existing RPCs), apply it, then regenerate types. The full current schema (tables, functions, triggers, policies) is already captured in `00000000000000_baseline_schema.sql`.
