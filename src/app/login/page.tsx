@@ -43,11 +43,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-stone-100 to-amber-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground text-2xl font-bold mb-4">
-            χ
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">{COMPANY.name}</h1>
-          <p className="text-sm text-gray-500 mt-1">Lab Management System</p>
+          <img src="/logo.png" alt={COMPANY.name} className="h-10 w-auto mx-auto mb-3 object-contain" />
+          <p className="text-sm text-gray-500">Lab Management System</p>
         </div>
 
         <Card>

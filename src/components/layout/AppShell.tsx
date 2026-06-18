@@ -74,9 +74,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col h-full">
       <div className="p-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg flex-shrink-0">
-            C
-          </div>
+          <img src="/logo-mark.png" alt="" className="w-9 h-9 flex-shrink-0 object-contain" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">Chi Dental Lab</p>
           </div>
@@ -152,6 +150,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
+          <img src="/logo-mark.png" alt="" className="w-6 h-6 object-contain" />
           <span className="text-sm font-semibold text-gray-900">{COMPANY.name}</span>
         </header>
 
