@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
@@ -23,7 +23,7 @@ import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, ChevronRight, Pencil,
 import { canEditInvoice } from '@/lib/invoice-permissions'
 import { isVoided, isOverdue, nextStatusAfterPayment } from '@/lib/invoice-status'
 import { voidInvoice as voidInvoiceAction, restoreInvoice } from '@/lib/invoices/void-actions'
-import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStage, ServiceStatus, Product } from '@/lib/database.types'
+import type { Invoice, InvoiceItem, InvoiceItemStatusHistory, Payment, Customer, WorkStage, ServiceStatus, Product, TablesUpdate } from '@/lib/database.types'
 import { COMPANY, BANK } from '@/lib/config'
 import { cn } from '@/lib/utils'
 import { WorkStatusBadge } from '@/components/work-status-badge'
@@ -116,12 +116,15 @@ export default function InvoiceDetailPage() {
 
   const [actionError, setActionError] = useState('')
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<PaymentForm>({
-    resolver: zodResolver(paymentSchema),
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<PaymentForm>({
+    // zod's `coerce.number()` types the resolver input as `unknown`; cast to the
+    // form's value type so RHF's Resolver generics line up.
+    resolver: zodResolver(paymentSchema) as Resolver<PaymentForm>,
     defaultValues: { payment_date: todayISODate() },
   })
+  const watchedAmount = useWatch({ control, name: 'amount' })
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!id) return
     const [invRes, itemsRes, paymentsRes, ssRes, prodRes, stageRows] = await Promise.all([
       supabase.from('invoices').select('*, customers(*), service_statuses(*)').eq('id', id).single(),
@@ -156,7 +159,7 @@ export default function InvoiceDetailPage() {
       setHistory([])
     }
     setLoading(false)
-  }
+  }, [id])
 
   const updateWorkStatus = async (itemId: string, value: string) => {
     const { work_status, stage_id } = decodeWork(value)
@@ -183,7 +186,11 @@ export default function InvoiceDetailPage() {
   const currentServiceStatus = serviceStatuses.find(s => s.id === serviceStatusId)
     ?? (invoice?.service_statuses ?? null)
 
-  useEffect(() => { load() }, [id])
+  // `load` fetches asynchronously; its setState calls run after the await (post-
+  // fetch), not synchronously during the effect, so they don't cause the cascading
+  // re-render this rule guards against.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load() }, [load])
 
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0)
   // When an invoice is settled (status 'paid'), the balance is zero even if the
@@ -242,7 +249,7 @@ export default function InvoiceDetailPage() {
     setActionError('')
     try {
       const res = await voidInvoiceAction({ id: invoice.id, reason: voidReason })
-      if (!res.ok) { setActionError(res.error); return }
+      if (!res.ok) { setActionError((res as { error: string }).error); return }
       setVoidOpen(false)
       setVoidReason('')
       load()
@@ -261,7 +268,7 @@ export default function InvoiceDetailPage() {
     setActionError('')
     try {
       const res = await restoreInvoice({ id: invoice.id })
-      if (!res.ok) { setActionError(res.error); return }
+      if (!res.ok) { setActionError((res as { error: string }).error); return }
       load()
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Could not restore the invoice. Please try again.')
@@ -306,7 +313,7 @@ export default function InvoiceDetailPage() {
       })
       .eq('id', invoice.id)
     if (alsoSaveToCustomer && invoice.customer_id) {
-      const customerUpdate: Record<string, string | null> = {
+      const customerUpdate: TablesUpdate<'customers'> = {
         contact_person: nextBillContact,
         phone: nextBillPhone,
         billing_address: nextBilling,
@@ -429,6 +436,9 @@ export default function InvoiceDetailPage() {
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
+            {/* Plain <img>: this is a printable invoice document header, where
+                next/image's lazy-loading and srcset rewriting render unreliably. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt={COMPANY.name} className="max-h-10 max-w-[200px] object-contain object-left mb-2" />
             <div className="text-sm text-gray-500 whitespace-pre-line">{COMPANY.address}</div>
             {COMPANY.phone && <div className="text-sm text-gray-500">Tel: {COMPANY.phone}</div>}
@@ -1250,7 +1260,7 @@ export default function InvoiceDetailPage() {
               <Label>Amount (MYR) *</Label>
               <Input type="number" min="0.01" step="0.01" {...register('amount')} />
               {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
-              {!errors.amount && outstanding > 0 && Number(watch('amount')) > outstanding && (
+              {!errors.amount && outstanding > 0 && Number(watchedAmount) > outstanding && (
                 <p className="text-xs text-amber-600">
                   Exceeds the outstanding balance of {formatCurrency(outstanding)}.
                 </p>

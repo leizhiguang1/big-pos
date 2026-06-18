@@ -105,6 +105,10 @@ export default function WorkPage() {
     setLoading(false)
   }
 
+  // `load` fetches asynchronously; its setState calls run after the await (post-
+  // fetch), not synchronously during the effect, so they don't cause the cascading
+  // re-render this rule guards against.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [])
 
   const allStagesById = useMemo(() => new Map(stages.map(s => [s.id, s])), [stages])

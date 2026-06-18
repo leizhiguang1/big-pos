@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
@@ -63,11 +63,13 @@ export default function ProductsPage() {
   const [editing, setEditing] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<FormData>({
+    // zod's `coerce.number()` types the resolver input as `unknown`; cast to the
+    // form's value type so RHF's Resolver generics line up.
+    resolver: zodResolver(schema) as Resolver<FormData>,
     defaultValues: { unit: 'per unit', unit_price: 0, use_price_range: false },
   })
-  const usePriceRange = watch('use_price_range')
+  const usePriceRange = useWatch({ control, name: 'use_price_range' })
 
   const load = () =>
     supabase.from('products').select('*').order('name').then(({ data }) => {

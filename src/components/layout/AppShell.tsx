@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -42,6 +43,80 @@ const viewGuards: { prefix: string; permission: Permission }[] = [
   { prefix: '/reports', permission: 'reports.view' },
 ]
 
+// Declared at module scope (not inside AppShell's render) so the component keeps
+// a stable identity across renders — see react-hooks/static-components.
+function SidebarContent({
+  items,
+  activeHref,
+  username,
+  roleName,
+  onNavigate,
+  onSignOut,
+}: {
+  items: NavItem[]
+  activeHref: string
+  username: string
+  roleName: string
+  onNavigate: () => void
+  onSignOut: () => void
+}) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4">
+        <div className="flex items-center gap-3">
+          <Image src="/logo-mark.png" alt="" width={36} height={36} className="w-9 h-9 flex-shrink-0 object-contain" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">Chi Dental Lab</p>
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      <nav className="flex-1 p-3 space-y-1">
+        {items.map(({ href, icon: Icon, label }) => {
+          const isActive = href === activeHref
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onNavigate}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              )}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              {label}
+              <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-40" />
+            </Link>
+          )
+        })}
+      </nav>
+
+      <Separator />
+
+      <div className="p-3">
+        <div className="px-3 py-2 mb-1">
+          <p className="text-sm font-medium text-gray-700 truncate">{username}</p>
+          <p className="text-xs text-gray-400 capitalize">{roleName}</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-gray-600 hover:text-red-600 hover:bg-red-50"
+          onClick={onSignOut}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign out
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { username, roleName, hasPermission, loading, signOut } = useAuth()
   const router = useRouter()
@@ -70,75 +145,35 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.refresh()
   }
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-4">
-        <div className="flex items-center gap-3">
-          <img src="/logo-mark.png" alt="" className="w-9 h-9 flex-shrink-0 object-contain" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">Chi Dental Lab</p>
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      <nav className="flex-1 p-3 space-y-1">
-        {items.map(({ href, icon: Icon, label }) => {
-          const isActive = href === activeHref
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setSidebarOpen(false)}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-              )}
-            >
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              {label}
-              <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-40" />
-            </Link>
-          )
-        })}
-      </nav>
-
-      <Separator />
-
-      <div className="p-3">
-        <div className="px-3 py-2 mb-1">
-          <p className="text-sm font-medium text-gray-700 truncate">{username}</p>
-          <p className="text-xs text-gray-400 capitalize">{roleName}</p>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-gray-600 hover:text-red-600 hover:bg-red-50"
-          onClick={handleSignOut}
-        >
-          <LogOut className="h-4 w-4 mr-2" />
-          Sign out
-        </Button>
-      </div>
-    </div>
-  )
+  const closeSidebar = () => setSidebarOpen(false)
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-60 bg-white border-r border-gray-200 flex-shrink-0">
-        <SidebarContent />
+        <SidebarContent
+          items={items}
+          activeHref={activeHref}
+          username={username}
+          roleName={roleName}
+          onNavigate={closeSidebar}
+          onSignOut={handleSignOut}
+        />
       </aside>
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
+          <div className="absolute inset-0 bg-black/40" onClick={closeSidebar} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50">
-            <SidebarContent />
+            <SidebarContent
+              items={items}
+              activeHref={activeHref}
+              username={username}
+              roleName={roleName}
+              onNavigate={closeSidebar}
+              onSignOut={handleSignOut}
+            />
           </aside>
         </div>
       )}
@@ -150,7 +185,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          <img src="/logo-mark.png" alt="" className="w-6 h-6 object-contain" />
+          <Image src="/logo-mark.png" alt="" width={24} height={24} className="w-6 h-6 object-contain" />
           <span className="text-sm font-semibold text-gray-900">{COMPANY.name}</span>
         </header>
 

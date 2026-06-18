@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '@/lib/supabase'
@@ -34,12 +34,12 @@ export default function WorkStagesPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, control, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { label: '', color: DEFAULT_COLOR },
   })
-  const watchedColor = watch('color')
-  const watchedLabel = watch('label')
+  const watchedColor = useWatch({ control, name: 'color' })
+  const watchedLabel = useWatch({ control, name: 'label' })
 
   const load = () =>
     supabase

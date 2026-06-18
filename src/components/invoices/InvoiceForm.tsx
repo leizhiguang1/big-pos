@@ -89,7 +89,7 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
     ]).then(([invRes, itemsRes]) => {
       const inv = invRes.data as Invoice | null
       if (inv) {
-        setLoadedStatus(inv.status)
+        setLoadedStatus(inv.status as InvoiceStatus)
         setLoadedVoidedAt(inv.voided_at)
         setCustomerId(inv.customer_id)
         setInvoiceDate(inv.invoice_date)
@@ -134,8 +134,13 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
     }
   }, [isEdit, authLoading, loadedStatus, loadedVoidedAt, hasPermission, invoiceId, router])
 
-  // When the user picks a (different) customer, fill the recipient block from
-  // that customer's master record. Skipped on initial load in edit mode.
+  // When the user picks a (different) customer, fill the recipient block from that
+  // customer's master record. Deliberate external-sync effect: it must also run
+  // once `customers` finishes loading for a URL-preselected customer, so the logic
+  // can't live solely in the Select's onChange. The ref guard skips the initial
+  // edit-mode load so saved recipients aren't clobbered, and the grouped setState
+  // calls batch into a single render — no cascading-render problem here.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (customers.length === 0 && customerId) return
     if (recipientSyncRef.current === customerId) return
@@ -154,6 +159,7 @@ export default function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
     setShipToContact(c.contact_person ?? '')
     setDeliveryAddress(c.delivery_address ?? '')
   }, [customerId, customers])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const recipientDirty = selectedCustomer
     ? billToName !== (selectedCustomer.clinic_name ?? '')

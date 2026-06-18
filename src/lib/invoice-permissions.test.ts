@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import type { Invoice } from './database.types'
 import { canEditInvoice } from './invoice-permissions'
 
-const inv = (status: string, voided_at: string | null = null) => ({ status, voided_at } as any)
+const inv = (status: string, voided_at: string | null = null): Pick<Invoice, 'status' | 'voided_at'> => ({ status, voided_at })
 const allow = () => true
 const deny = () => false
 const only = (...perms: string[]) => (p: string) => perms.includes(p)

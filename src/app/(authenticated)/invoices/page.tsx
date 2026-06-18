@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -35,7 +35,6 @@ type InvoiceWithItems = Invoice & {
 export default function InvoicesPage() {
   const router = useRouter()
   const [invoices, setInvoices] = useState<InvoiceWithItems[]>([])
-  const [filtered, setFiltered] = useState<InvoiceWithItems[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [workFilter, setWorkFilter] = useState<'all' | WorkStatus>('all')
@@ -49,29 +48,26 @@ export default function InvoicesPage() {
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setInvoices((data ?? []) as InvoiceWithItems[])
-        setFiltered((data ?? []) as InvoiceWithItems[])
         setLoading(false)
       })
   }, [])
 
-  useEffect(() => {
+  const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    setFiltered(
-      invoices.filter(inv => {
-        const matchSearch =
-          inv.invoice_number.toLowerCase().includes(q) ||
-          ((inv.customers as { clinic_name: string })?.clinic_name ?? '').toLowerCase().includes(q)
-        const matchStatus =
-          statusFilter === 'all' ? true :
-          statusFilter === 'void' ? isVoided(inv) :
-          statusFilter === 'overdue' ? isOverdue(inv, today) :
-          (!isVoided(inv) && inv.status === statusFilter)
-        const matchWork =
-          workFilter === 'all' ||
-          (inv.invoice_items ?? []).some(it => it.work_status === workFilter)
-        return matchSearch && matchStatus && matchWork
-      })
-    )
+    return invoices.filter(inv => {
+      const matchSearch =
+        inv.invoice_number.toLowerCase().includes(q) ||
+        ((inv.customers as { clinic_name: string })?.clinic_name ?? '').toLowerCase().includes(q)
+      const matchStatus =
+        statusFilter === 'all' ? true :
+        statusFilter === 'void' ? isVoided(inv) :
+        statusFilter === 'overdue' ? isOverdue(inv, today) :
+        (!isVoided(inv) && inv.status === statusFilter)
+      const matchWork =
+        workFilter === 'all' ||
+        (inv.invoice_items ?? []).some(it => it.work_status === workFilter)
+      return matchSearch && matchStatus && matchWork
+    })
   }, [search, statusFilter, workFilter, invoices, today])
 
   return (

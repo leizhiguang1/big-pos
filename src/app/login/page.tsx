@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -43,7 +44,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-stone-100 to-amber-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt={COMPANY.name} className="h-10 w-auto mx-auto mb-3 object-contain" />
+          <Image src="/logo.png" alt={COMPANY.name} width={317} height={40} priority className="h-10 w-auto mx-auto mb-3 object-contain" />
           <p className="text-sm text-gray-500">Lab Management System</p>
         </div>
 

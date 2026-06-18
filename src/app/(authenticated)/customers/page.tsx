@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -17,7 +17,6 @@ export default function CustomersPage() {
   const router = useRouter()
   const { hasPermission } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [filtered, setFiltered] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -28,19 +27,16 @@ export default function CustomersPage() {
       .order('clinic_name')
       .then(({ data }) => {
         setCustomers(data ?? [])
-        setFiltered(data ?? [])
         setLoading(false)
       })
   }, [])
 
-  useEffect(() => {
+  const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    setFiltered(
-      customers.filter(c =>
-        c.clinic_name.toLowerCase().includes(q) ||
-        (c.contact_person ?? '').toLowerCase().includes(q) ||
-        (c.phone ?? '').includes(q)
-      )
+    return customers.filter(c =>
+      c.clinic_name.toLowerCase().includes(q) ||
+      (c.contact_person ?? '').toLowerCase().includes(q) ||
+      (c.phone ?? '').includes(q)
     )
   }, [search, customers])
 

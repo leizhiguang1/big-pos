@@ -42,12 +42,16 @@ export default function RolesManager() {
     setLoading(false)
   }
 
+  // `load` fetches asynchronously; its setState calls run after the await (post-
+  // fetch), not synchronously during the effect, so they don't cause the cascading
+  // re-render this rule guards against.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [])
 
   const remove = async (role: RoleRow) => {
     if (!confirm(`Delete the “${role.name}” role?`)) return
     const res = await deleteRole({ id: role.id })
-    if (!res.ok) { alert(res.error); return }
+    if (!res.ok) { alert((res as { error: string }).error); return }
     await load()
   }
 
@@ -140,7 +144,7 @@ function RoleDialog({
         ? await createRole({ name, description, permissions })
         : await updateRole({ id: state.role.id, name, description, permissions })
       if (res.ok) await onSaved()
-      else setError(res.error)
+      else setError((res as { error: string }).error)
     } catch (err) {
       // A thrown server action (env/auth/network failure) would otherwise leave
       // the button stuck on "Saving…" with no explanation. Surface it instead.

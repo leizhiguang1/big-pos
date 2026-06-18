@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import type { Invoice } from './database.types'
 import { isVoided, countsAsRevenue, isOutstanding, isOverdue, nextStatusAfterPayment } from './invoice-status'
 
-const inv = (status: string, voided_at: string | null = null) =>
-  ({ status, voided_at } as any)
+const inv = (status: string, voided_at: string | null = null): Pick<Invoice, 'status' | 'voided_at'> =>
+  ({ status, voided_at })
 
-const dueInv = (status: string, due_date: string | null, voided_at: string | null = null) =>
-  ({ status, due_date, voided_at } as any)
+const dueInv = (status: string, due_date: string | null, voided_at: string | null = null): Pick<Invoice, 'status' | 'due_date' | 'voided_at'> =>
+  ({ status, due_date, voided_at })
 
 describe('isVoided', () => {
   it('is false when voided_at is null', () => {

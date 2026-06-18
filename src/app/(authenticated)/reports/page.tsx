@@ -24,20 +24,29 @@ export default function ReportsPage() {
   const [dateFrom, setDateFrom] = useState(format(startOfMonth(subMonths(new Date(), 0)), 'yyyy-MM-dd'))
   const [dateTo, setDateTo] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'))
   const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [loading, setLoading] = useState(false)
+  // `loading` is derived: true until the fetch for the current date range lands.
+  // Storing it as a key (rather than a synchronous setState in the effect) keeps
+  // the loading flag in sync with the range without an extra render.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
+  const rangeKey = `${dateFrom}|${dateTo}`
+  const loading = loadedKey !== rangeKey
 
   useEffect(() => {
-    setLoading(true)
+    let active = true
     supabase
       .from('invoices')
       .select('*, customers(clinic_name), invoice_items(*, products(name))')
       .gte('invoice_date', dateFrom)
       .lte('invoice_date', dateTo)
       .then(({ data }) => {
-        setInvoices((data ?? []) as Invoice[])
-        setLoading(false)
+        if (!active) return
+        // The query selects a narrowed `customers(clinic_name)` projection, so
+        // cast through `unknown` to the app's fuller Invoice relation type.
+        setInvoices((data ?? []) as unknown as Invoice[])
+        setLoadedKey(rangeKey)
       })
-  }, [dateFrom, dateTo])
+    return () => { active = false }
+  }, [dateFrom, dateTo, rangeKey])
 
   // Voided invoices are cancelled — they must not count in any total.
   const active = invoices.filter(i => !isVoided(i))
