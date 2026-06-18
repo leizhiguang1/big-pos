@@ -1,6 +1,9 @@
 # Claude Code
 .claude/
 
+# Playwright MCP debug artifacts
+.playwright-mcp/
+
 # Logs
 logs
 *.log
