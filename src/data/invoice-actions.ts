@@ -63,8 +63,8 @@ import type { Json, TablesUpdate, WorkStatus } from '@/lib/database.types'
 export type ActionResult = { ok: true } | { ok: false; error: string }
 export type CreateResult = { ok: true; id: string } | { ok: false; error: string }
 
-// Re-export the void/restore actions so callers have a single import surface.
-export { voidInvoice, restoreInvoice } from '@/lib/invoices/void-actions'
+// Void/restore live in `@/lib/invoices/void-actions` — import them directly.
+// (A 'use server' file may only export async functions, so we can't re-export here.)
 
 // Shape the create/update form sends for the invoice header. Mirrors
 // `InvoiceForm.invoicePayload()`. Status + created_by are added server-side.
