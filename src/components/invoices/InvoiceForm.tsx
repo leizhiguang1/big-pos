@@ -280,8 +280,9 @@ export default function InvoiceForm({
     router.push(`/invoices/${invoiceId}`)
   }
 
-  // While auth resolves or a locked invoice redirects away, hold on the spinner.
-  const blocked = isEdit && loadedStatus !== null && !authLoading && !canEditInvoice({ status: loadedStatus, voided_at: loadedVoidedAt }, hasPermission)
+  // While auth resolves (edit mode) or a locked invoice redirects away, hold on
+  // the spinner so the editable form never flashes before the lock decision.
+  const blocked = isEdit && (authLoading || (loadedStatus !== null && !canEditInvoice({ status: loadedStatus, voided_at: loadedVoidedAt }, hasPermission)))
 
   if (blocked) {
     return <div className="flex items-center justify-center h-40"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div>

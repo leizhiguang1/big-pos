@@ -107,8 +107,8 @@ function revalidateInvoice(id: string) {
 // current status + void marker, then requires invoices.edit for drafts and
 // invoices.manage for already-sent (or voided → locked for everyone).
 async function gateForContentEdit(id: string): Promise<PermissionCheck> {
-  // Read status with whatever the caller can already see (RLS-aware), via the
-  // admin client (no session here) — this is a server-trusted lookup.
+  // Server-trusted lookup of status + void marker via the admin client (the
+  // role/permission enforcement still happens in requirePermission below).
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('invoices')
@@ -194,7 +194,9 @@ export async function markInvoicePaidAction(id: string, reference?: string): Pro
 }
 
 export async function markSentAction(id: string): Promise<ActionResult> {
-  const gate = await requirePermission('invoices.edit')
+  // Route through the content-edit gate so a voided draft can't be marked sent
+  // (it also yields invoices.edit for a draft, matching the original UI gating).
+  const gate = await gateForContentEdit(id)
   if (!gate.ok) return gate
 
   const admin = createAdminClient()
