@@ -226,18 +226,19 @@ export async function updateWorkStatusAction(
   // status remembers where to return to; moving OFF on_hold clears the memory.
   const { data: current, error: readErr } = await supabase
     .from('invoice_items')
-    .select('work_status')
+    .select('work_status, resume_status')
     .eq('id', itemId)
     .single()
   if (readErr || !current) return { ok: false, error: readErr?.message ?? 'Work item not found' }
 
   // - entering on_hold from a non-hold status → remember it (hold().resumeFrom)
-  // - otherwise (any non-hold target) → forget the remembered status
-  // - re-selecting on_hold while already on_hold is a no-op for resume_status.
+  // - re-selecting on_hold while already on_hold → PRESERVE the remembered status
+  //   (don't let a misclick wipe where to resume to)
+  // - any non-hold target → forget the remembered status
   const resume_status: WorkStatus | null =
     input.work_status === 'on_hold'
       ? current.work_status === 'on_hold'
-        ? null
+        ? (current.resume_status as WorkStatus | null)
         : hold(current.work_status).resumeFrom
       : null
 

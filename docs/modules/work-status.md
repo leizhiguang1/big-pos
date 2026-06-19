@@ -61,7 +61,14 @@ hold(current)  // → { status: 'on_hold', resumeFrom: current }
 resume(resumeFrom)  // → resumeFrom ?? 'received'
 ```
 
-When placing an item on hold the caller is responsible for persisting `resumeFrom` in the `resume_status` column (added in Plan 2 — not yet in the live DB schema). Until that column exists, `resumeFrom` is reconstructed from context.
+**Wired as of Plan 4** (server-first). The `resume_status` column (Plan 2) exists in the live DB. `updateWorkStatusAction` (`src/data/invoice-actions.ts`) manages it automatically:
+- entering `on_hold` from a non-hold status → stores the prior `work_status` in `resume_status` (`hold().resumeFrom`);
+- re-selecting `on_hold` while already on hold → **preserves** the remembered status (a misclick won't wipe it);
+- any non-hold target → clears `resume_status` to null.
+
+The work queue and the invoice-detail editor surface a **"Resume (&lt;prior&gt;)"** option on held items, targeting `resume(resume_status)` (falls back to `received`).
+
+**Known limitation:** `resume_status` is a bare `work_status` enum, so an item held while `in_progress` **on a specific stage** resumes to bare `in_progress` (stage_id cleared) — the stage is not remembered. Storing the encoded value (or a `resume_stage_id` column) would be needed to preserve it; deferred.
 
 ---
 
@@ -128,6 +135,5 @@ An empty item set returns `'received'`.
 ### Change the stage subdivision logic
 Edit `encodeWork`/`decodeWork` in `src/domain/production.ts`. Both directions must stay inverse to each other. The encoded string format (`stage:<id>`) is used as a React key and a URL-parameter value — changing the format is a breaking change.
 
-### Add the `resume_status` column (Plan 2)
-Run a migration: `ALTER TABLE invoice_items ADD COLUMN resume_status work_status;`  
-Then update the `hold`/`resume` callers to persist and read this column.
+### Remember the stage across an on_hold round-trip
+Currently `resume_status` (a bare `work_status`) loses the `in_progress` stage. To preserve it, either store the **encoded** value (`stage:<id>`) in a `text` column or add a `resume_stage_id` FK, then have `updateWorkStatusAction` capture/restore it alongside `resume_status`.
