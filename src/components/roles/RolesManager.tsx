@@ -125,7 +125,11 @@ function RoleDialog({
   const role = state.mode === 'edit' ? state.role : null
   const [name, setName] = useState(role?.name ?? '')
   const [description, setDescription] = useState(role?.description ?? '')
-  const [perms, setPerms] = useState<Set<string>>(new Set(role?.perms ?? []))
+  // Keep only permissions still in the catalogue — guards against a role that
+  // holds a retired permission (e.g. legacy services.*) re-submitting it.
+  const [perms, setPerms] = useState<Set<string>>(
+    new Set([...(role?.perms ?? [])].filter(p => (ALL_PERMISSION_KEYS as string[]).includes(p))),
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
