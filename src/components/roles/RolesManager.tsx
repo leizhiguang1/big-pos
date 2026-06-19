@@ -14,6 +14,9 @@ import { PERMISSION_GROUPS, type Permission } from '@/domain/permissions'
 import { createRole, updateRole, deleteRole } from '@/lib/auth/role-actions'
 import type { Role } from '@/lib/database.types'
 
+// Flat list of every assignable permission key — used by the select-all toggle.
+const ALL_PERMISSION_KEYS: Permission[] = PERMISSION_GROUPS.flatMap(g => g.permissions.map(p => p.key))
+
 type RoleRow = Role & { perms: Set<string>; userCount: number }
 type DialogState = { mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; role: RoleRow }
 
@@ -134,6 +137,16 @@ function RoleDialog({
     })
   }
 
+  const allSelected = perms.size === ALL_PERMISSION_KEYS.length
+  const setAll = (on: boolean) => setPerms(on ? new Set(ALL_PERMISSION_KEYS) : new Set())
+  const setGroup = (keys: Permission[], on: boolean) => {
+    setPerms(prev => {
+      const next = new Set(prev)
+      for (const k of keys) { if (on) next.add(k); else next.delete(k) }
+      return next
+    })
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -171,19 +184,42 @@ function RoleDialog({
           </div>
 
           <div className="space-y-4">
-            {PERMISSION_GROUPS.map(group => (
-              <div key={group.label}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{group.label}</p>
-                <div className="space-y-2">
-                  {group.permissions.map(p => (
-                    <label key={p.key} className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer">
-                      <Checkbox checked={perms.has(p.key)} onCheckedChange={() => toggle(p.key)} />
-                      {p.label}
-                    </label>
-                  ))}
+            <div className="flex items-center justify-between border-b pb-2">
+              <Label>Permissions</Label>
+              <button
+                type="button"
+                onClick={() => setAll(!allSelected)}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                {allSelected ? 'Clear all' : 'Select all'}
+              </button>
+            </div>
+            {PERMISSION_GROUPS.map(group => {
+              const keys = group.permissions.map(p => p.key)
+              const groupSelected = keys.every(k => perms.has(k))
+              return (
+                <div key={group.label}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{group.label}</p>
+                    <button
+                      type="button"
+                      onClick={() => setGroup(keys, !groupSelected)}
+                      className="text-xs text-gray-400 hover:text-primary"
+                    >
+                      {groupSelected ? 'Clear' : 'Select all'}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {group.permissions.map(p => (
+                      <label key={p.key} className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer">
+                        <Checkbox checked={perms.has(p.key)} onCheckedChange={() => toggle(p.key)} />
+                        {p.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
