@@ -26,7 +26,7 @@ type FormData = z.infer<typeof schema>
 
 export default function ServiceStatusesPage() {
   const { hasPermission } = useAuth()
-  const canEdit = hasPermission('services.edit')
+  const canEdit = hasPermission('settings.manage')
   const [rows, setRows] = useState<ServiceStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)

@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, Plus, Pencil, Trash2, ShieldCheck } from 'lucide-react'
-import { PERMISSION_GROUPS, type Permission } from '@/domain/permissions'
+import { PERMISSION_GROUPS, PERMISSION_REQUIRES, type Permission } from '@/domain/permissions'
 import { createRole, updateRole, deleteRole } from '@/lib/auth/role-actions'
 import type { Role } from '@/lib/database.types'
 
@@ -129,10 +129,24 @@ function RoleDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // edit/manage imply their view; removing a view clears its dependents — so a
+  // role can never end up able to edit a section it cannot open.
+  const grant = (set: Set<string>, key: Permission) => {
+    set.add(key)
+    const req = PERMISSION_REQUIRES[key]
+    if (req) set.add(req)
+  }
+  const revoke = (set: Set<string>, key: Permission) => {
+    set.delete(key)
+    for (const [dependent, req] of Object.entries(PERMISSION_REQUIRES)) {
+      if (req === key) set.delete(dependent)
+    }
+  }
+
   const toggle = (key: Permission) => {
     setPerms(prev => {
       const next = new Set(prev)
-      if (next.has(key)) next.delete(key); else next.add(key)
+      if (next.has(key)) revoke(next, key); else grant(next, key)
       return next
     })
   }
@@ -142,7 +156,7 @@ function RoleDialog({
   const setGroup = (keys: Permission[], on: boolean) => {
     setPerms(prev => {
       const next = new Set(prev)
-      for (const k of keys) { if (on) next.add(k); else next.delete(k) }
+      for (const k of keys) { if (on) grant(next, k); else revoke(next, k) }
       return next
     })
   }
@@ -211,9 +225,12 @@ function RoleDialog({
                   </div>
                   <div className="space-y-2">
                     {group.permissions.map(p => (
-                      <label key={p.key} className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer">
-                        <Checkbox checked={perms.has(p.key)} onCheckedChange={() => toggle(p.key)} />
-                        {p.label}
+                      <label key={p.key} className="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer">
+                        <Checkbox className="mt-0.5" checked={perms.has(p.key)} onCheckedChange={() => toggle(p.key)} />
+                        <span>
+                          {p.label}
+                          {p.description && <span className="block text-xs text-gray-400">{p.description}</span>}
+                        </span>
                       </label>
                     ))}
                   </div>
