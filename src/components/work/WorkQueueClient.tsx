@@ -320,14 +320,17 @@ export function WorkQueueClient({ rows, stages }: { rows: WorkQueueRow[]; stages
                           isMoved && 'bg-green-50/60'
                         )}
                       >
-                        <div className="md:w-48 min-w-0">
+                        <div className="md:w-28 min-w-0">
                           <Link
                             href={`/invoices/${row.invoices?.id}`}
                             className="text-sm font-medium text-primary hover:underline"
                           >
                             {row.invoices?.invoice_number ?? '—'}
                           </Link>
-                          <div className="text-xs text-gray-500 truncate">
+                        </div>
+
+                        <div className="md:w-48 min-w-0">
+                          <div className="text-sm text-gray-700 truncate">
                             {row.invoices?.customers?.clinic_name ?? '—'}
                           </div>
                         </div>
