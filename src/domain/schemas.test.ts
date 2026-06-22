@@ -42,6 +42,10 @@ describe('schemas', () => {
     expect(normalizeUnit('   ')).toBe('')
     expect(normalizeUnit('per ')).toBe('')
   })
+  it('normalizeUnit does not strip "per" when not followed by whitespace', () => {
+    expect(normalizeUnit('persistent')).toBe('persistent')
+    expect(normalizeUnit('perfect')).toBe('perfect')
+  })
   it('productInputSchema normalizes the unit on parse', () => {
     const parsed = productInputSchema.safeParse(product({ unit: 'Per Tooth' }))
     expect(parsed.success).toBe(true)

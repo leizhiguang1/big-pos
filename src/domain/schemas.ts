@@ -6,7 +6,7 @@ import { z } from 'zod'
  * noun, e.g. "tooth"). Returns "" for blank or bare-"per " input.
  */
 export function normalizeUnit(raw: string): string {
-  return raw.trim().toLowerCase().replace(/^per\s*/, '').trim()
+  return raw.trim().toLowerCase().replace(/^per(?:\s+|$)/, '').trim()
 }
 
 export const lineItemSchema = z.object({
