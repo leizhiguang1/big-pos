@@ -10,11 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { statusBadgeVariant } from '@/lib/status-badge'
 import type { ReportSummary } from '@/lib/reports'
-
-const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
-  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive',
-}
 
 // Interactive shell for the reports page. The Server Component fetches + computes
 // `summary`; this island renders it and drives the date range through the URL so
@@ -107,7 +104,7 @@ export function ReportsClient({ from, to, summary }: { from: string; to: string;
                       </TableCell>
                       <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>
+                        <Badge variant={statusBadgeVariant('payment', inv.status)} className="capitalize">{inv.status}</Badge>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -140,7 +137,7 @@ export function ReportsClient({ from, to, summary }: { from: string; to: string;
                       <TableCell className="text-sm">{formatDate(inv.invoice_date)}</TableCell>
                       <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>
+                        <Badge variant={statusBadgeVariant('payment', inv.status)} className="capitalize">{inv.status}</Badge>
                       </TableCell>
                     </TableRow>
                   ))}

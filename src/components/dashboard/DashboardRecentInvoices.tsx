@@ -5,11 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { isVoided } from '@/lib/invoice-status'
+import { statusBadgeVariant } from '@/lib/status-badge'
 import type { DashboardRecentInvoice } from '@/data/dashboard'
-
-const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'outline' | 'info'> = {
-  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive',
-}
 
 // Recent-invoices table for the dashboard. Client island only because the rows
 // navigate to the invoice; the data is fetched server-side and passed in.
@@ -42,7 +39,7 @@ export function DashboardRecentInvoices({ invoices }: { invoices: DashboardRecen
             <TableCell>
               {isVoided(inv)
                 ? <Badge variant="destructive" className="uppercase">Voided</Badge>
-                : <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>}
+                : <Badge variant={statusBadgeVariant('payment', inv.status)} className="capitalize">{inv.status}</Badge>}
             </TableCell>
           </TableRow>
         ))}

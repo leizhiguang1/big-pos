@@ -6,11 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { isVoided } from '@/lib/invoice-status'
+import { statusBadgeVariant } from '@/lib/status-badge'
 import type { Invoice } from '@/lib/database.types'
-
-const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
-  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive',
-}
 
 // Read-only invoice history for a customer, with rows that navigate to the
 // invoice. Client island only because the rows are clickable; the data is
@@ -45,7 +42,7 @@ export function CustomerInvoiceHistory({ invoices }: { invoices: Invoice[] }) {
                 <TableCell>
                   {isVoided(inv)
                     ? <Badge variant="destructive" className="uppercase">Voided</Badge>
-                    : <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>}
+                    : <Badge variant={statusBadgeVariant('payment', inv.status)} className="capitalize">{inv.status}</Badge>}
                 </TableCell>
               </TableRow>
             ))}

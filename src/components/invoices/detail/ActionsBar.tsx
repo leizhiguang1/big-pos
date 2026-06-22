@@ -25,6 +25,7 @@ import { formatCurrency, todayISODate } from '@/lib/utils'
 import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, Pencil, Lock } from 'lucide-react'
 import { canEditInvoice } from '@/lib/invoice-permissions'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
+import { statusBadgeVariant } from '@/lib/status-badge'
 import {
   markSentAction,
   markInvoicePaidAction,
@@ -32,10 +33,6 @@ import {
 } from '@/data/invoice-actions'
 import { voidInvoice as voidInvoiceAction, restoreInvoice } from '@/lib/invoices/void-actions'
 import type { InvoiceDetail } from '@/data/invoices'
-
-const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
-  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive',
-}
 
 const paymentSchema = z.object({
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0'),
@@ -160,7 +157,7 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
             <h1 className="text-2xl font-bold text-gray-900">{invoice.invoice_number}</h1>
             {overdue
               ? <Badge variant="destructive" className="capitalize">Overdue</Badge>
-              : <Badge variant={STATUS_VARIANT[invoice.status] ?? 'secondary'} className="capitalize">{invoice.status}</Badge>}
+              : <Badge variant={statusBadgeVariant('payment', invoice.status)} className="capitalize">{invoice.status}</Badge>}
             {voided && (
               <Badge variant="destructive" className="uppercase">Voided</Badge>
             )}
