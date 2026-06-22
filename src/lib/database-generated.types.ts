@@ -459,6 +459,30 @@ export type Database = {
         }
         Relationships: []
       }
+      units: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          sort_order: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       work_stages: {
         Row: {
           color: string | null
@@ -491,6 +515,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auth_has_permission: { Args: { p_perm: string }; Returns: boolean }
       create_invoice_with_items: {
         Args: { p_invoice: Json; p_items: Json }
         Returns: string

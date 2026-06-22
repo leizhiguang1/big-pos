@@ -31,6 +31,7 @@ export type Customer = Tables<'customers'>
 export type Product = Tables<'products'>
 export type ServiceStatus = Tables<'service_statuses'>
 export type WorkStage = Tables<'work_stages'>
+export type Unit = Tables<'units'>
 export type Role = Tables<'roles'>
 export type RolePermission = Tables<'role_permissions'>
 export type Payment = Tables<'payments'>
