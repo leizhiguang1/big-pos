@@ -16,9 +16,7 @@ import Link from 'next/link'
 import { useToast } from '@/components/feedback/toast'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
+import { WorkStatusSelect } from '@/components/work-status-select'
 import { Search, ChevronRight, ChevronDown, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkStatus, WorkStage } from '@/lib/database.types'
@@ -26,7 +24,7 @@ import {
   WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_FILLED, WORK_STATUS_OUTLINED,
 } from '@/lib/work-status'
 import {
-  encodeWork, decodeWork, workOptionsForItem,
+  encodeWork, decodeWork,
   labelForValue, colorForValue, orderedGroupKeys,
 } from '@/lib/work-stages'
 import { resume } from '@/domain/production'
@@ -311,7 +309,6 @@ export function WorkQueueClient({ rows, stages }: { rows: WorkQueueRow[]; stages
                     const movedTo = recentlyMoved.get(row.id)
                     const isMoved = movedTo !== undefined
                     const currentValue = encodeWork(row.work_status, row.stage_id)
-                    const options = workOptionsForItem(activeStages, row.work_status, row.stage_id, allStagesById)
                     return (
                       <div
                         key={row.id}
@@ -346,26 +343,20 @@ export function WorkQueueClient({ rows, stages }: { rows: WorkQueueRow[]; stages
                           )}
                         </div>
 
-                        <Select value={currentValue} onValueChange={v => updateStatus(row.id, v, row.resume_status)}>
-                          <SelectTrigger
-                            className={cn(
-                              'h-8 w-40 text-xs font-medium border-transparent',
-                              colorForValue(currentValue, allStagesById)
-                            )}
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {row.work_status === 'on_hold' && (
-                              <SelectItem value={RESUME_VALUE}>
-                                Resume ({WORK_STATUS_LABELS[resume(row.resume_status)]})
-                              </SelectItem>
-                            )}
-                            {options.map(o => (
-                              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <WorkStatusSelect
+                          value={currentValue}
+                          onValueChange={v => updateStatus(row.id, v, row.resume_status)}
+                          activeStages={activeStages}
+                          workStatus={row.work_status}
+                          stageId={row.stage_id}
+                          stagesById={allStagesById}
+                          triggerClassName="w-40"
+                          leadingItems={
+                            row.work_status === 'on_hold'
+                              ? [{ value: RESUME_VALUE, label: `Resume (${WORK_STATUS_LABELS[resume(row.resume_status)]})` }]
+                              : undefined
+                          }
+                        />
                       </div>
                     )
                   })}

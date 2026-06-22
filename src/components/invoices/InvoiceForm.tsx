@@ -8,28 +8,36 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency, cn } from '@/lib/utils'
-import { ArrowLeft, ChevronDown, ChevronRight, Plus, RotateCcw, Trash2 } from 'lucide-react'
-import type { InvoiceStatus } from '@/lib/database.types'
+import { ArrowLeft, ChevronDown, ChevronRight, Minus, Plus, RotateCcw, StickyNote, Tag, Trash2 } from 'lucide-react'
+import type { InvoiceStatus, Product } from '@/lib/database.types'
 import { addDays, format } from 'date-fns'
 import { DEFAULT_COLOR } from '@/lib/service-status'
 import { canEditInvoice } from '@/lib/invoice-permissions'
 import { createInvoiceAction, updateInvoiceAction } from '@/data/invoice-actions'
 import type { InvoicePayload, InvoiceItemPayload } from '@/data/invoice-actions'
 import type { InvoiceFormData, InvoiceForEdit } from '@/data/invoices'
+import { ProductSearchAdd } from './ProductSearchAdd'
 
 interface LineItem {
   id: string | null            // existing invoice_items.id, or null for a new row
   product_id: string | null
-  description: string
+  description: string          // prints on the invoice; defaults to the product name
   quantity: number
   unit_price: number
+  work_note: string            // internal lab remark (invoice_items.work_note); not shown to customer
 }
 
-const blankItem = (): LineItem => ({ id: null, product_id: null, description: '', quantity: 1, unit_price: 0 })
+// A customer's delivery address is "different" only when it is present AND not
+// identical to the billing address — drives the default state of the toggle.
+function deliveryDiffersFromBilling(delivery: string | null | undefined, billing: string | null | undefined): boolean {
+  const d = (delivery ?? '').trim()
+  return d !== '' && d !== (billing ?? '').trim()
+}
 
 export default function InvoiceForm({
   invoiceId,
@@ -59,18 +67,16 @@ export default function InvoiceForm({
   const [patient, setPatient] = useState(editInvoice?.patient ?? '')
   const [doctor, setDoctor] = useState(editInvoice?.doctor ?? '')
   const [serviceStatusId, setServiceStatusId] = useState<string | null>(editInvoice?.service_status_id ?? null)
-  const [items, setItems] = useState<LineItem[]>(() => {
-    const rows = editData?.items ?? []
-    return rows.length > 0
-      ? rows.map(r => ({
-          id: r.id,
-          product_id: r.product_id,
-          description: r.description,
-          quantity: Number(r.quantity),
-          unit_price: Number(r.unit_price),
-        }))
-      : [blankItem()]
-  })
+  const [items, setItems] = useState<LineItem[]>(() =>
+    (editData?.items ?? []).map(r => ({
+      id: r.id,
+      product_id: r.product_id,
+      description: r.description,
+      quantity: Number(r.quantity),
+      unit_price: Number(r.unit_price),
+      work_note: r.work_note ?? '',
+    })),
+  )
   const [billToName, setBillToName] = useState(editInvoice?.bill_to_name ?? '')
   const [billToContact, setBillToContact] = useState(editInvoice?.bill_to_contact ?? '')
   const [billToPhone, setBillToPhone] = useState(editInvoice?.bill_to_phone ?? '')
@@ -78,6 +84,9 @@ export default function InvoiceForm({
   const [shipToName, setShipToName] = useState(editInvoice?.ship_to_name ?? '')
   const [shipToContact, setShipToContact] = useState(editInvoice?.ship_to_contact ?? '')
   const [deliveryAddress, setDeliveryAddress] = useState(editInvoice?.delivery_address ?? '')
+  // When unchecked, deliver-to == bill-to: the Deliver To fields are hidden and
+  // persisted as null, which the invoice document renders as a single Bill-To column.
+  const [shipDifferent, setShipDifferent] = useState<boolean>(Boolean(editInvoice?.delivery_address?.trim()))
   const [showRecipient, setShowRecipient] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -119,7 +128,7 @@ export default function InvoiceForm({
     const c = customers.find(x => x.id === customerId) ?? null
     if (!c) {
       setBillToName(''); setBillToContact(''); setBillToPhone(''); setBillingAddress('')
-      setShipToName(''); setShipToContact(''); setDeliveryAddress('')
+      setShipToName(''); setShipToContact(''); setDeliveryAddress(''); setShipDifferent(false)
       return
     }
     setBillToName(c.clinic_name ?? '')
@@ -129,6 +138,7 @@ export default function InvoiceForm({
     setShipToName(c.clinic_name ?? '')
     setShipToContact(c.contact_person ?? '')
     setDeliveryAddress(c.delivery_address ?? '')
+    setShipDifferent(deliveryDiffersFromBilling(c.delivery_address, c.billing_address))
   }, [customerId, customers])
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -151,6 +161,17 @@ export default function InvoiceForm({
     setShipToName(selectedCustomer.clinic_name ?? '')
     setShipToContact(selectedCustomer.contact_person ?? '')
     setDeliveryAddress(selectedCustomer.delivery_address ?? '')
+    setShipDifferent(deliveryDiffersFromBilling(selectedCustomer.delivery_address, selectedCustomer.billing_address))
+  }
+
+  // Toggling "deliver to a different address" on: seed the recipient name/contact
+  // from Bill To so the user only has to type the new address.
+  const handleShipDifferentChange = (checked: boolean) => {
+    setShipDifferent(checked)
+    if (checked && !shipToName.trim() && !shipToContact.trim()) {
+      setShipToName(billToName)
+      setShipToContact(billToContact)
+    }
   }
 
   const currentServiceStatus = serviceStatuses.find(s => s.id === serviceStatusId) ?? null
@@ -158,23 +179,21 @@ export default function InvoiceForm({
   const updateItem = useCallback((index: number, field: keyof LineItem, value: string | number | null) => {
     setItems(prev => {
       const updated = [...prev]
-      if (field === 'product_id') {
-        const product = products.find(p => p.id === value)
-        updated[index] = {
-          ...updated[index],
-          product_id: (value as string) || null,
-          description: product?.name ?? updated[index].description,
-          unit_price: product?.unit_price ?? updated[index].unit_price,
-        }
-      } else {
-        updated[index] = { ...updated[index], [field]: value }
-      }
+      updated[index] = { ...updated[index], [field]: value }
       return updated
     })
-  }, [products])
+  }, [])
 
-  const addItem = () => setItems(prev => [...prev, blankItem()])
-  const removeItem = (i: number) => setItems(prev => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)))
+  // Product-first add: a picked product seeds the line (description = name,
+  // price = catalog default). Picking the same product twice adds a second line.
+  const addProduct = useCallback((p: Product) => {
+    setItems(prev => [
+      ...prev,
+      { id: null, product_id: p.id, description: p.name, quantity: 1, unit_price: p.unit_price, work_note: '' },
+    ])
+  }, [])
+
+  const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i))
 
   const subtotal = items.reduce((s, item) => s + item.quantity * item.unit_price, 0)
 
@@ -201,9 +220,11 @@ export default function InvoiceForm({
     bill_to_contact: billToContact.trim() || null,
     bill_to_phone: billToPhone.trim() || null,
     billing_address: billingAddress.trim() || null,
-    ship_to_name: shipToName.trim() || null,
-    ship_to_contact: shipToContact.trim() || null,
-    delivery_address: deliveryAddress.trim() || null,
+    // When "deliver to a different address" is off, persist no ship-to: the
+    // invoice document then renders Bill To as a single full-width column.
+    ship_to_name: shipDifferent ? (shipToName.trim() || null) : null,
+    ship_to_contact: shipDifferent ? (shipToContact.trim() || null) : null,
+    delivery_address: shipDifferent ? (deliveryAddress.trim() || null) : null,
     subtotal,
     total: subtotal,
   })
@@ -211,8 +232,9 @@ export default function InvoiceForm({
   const validate = () => {
     if (!customerId) { setError('Please select a customer.'); return false }
     if (!invoiceDate || !dueDate) { setError('Invoice date and due date are required.'); return false }
-    if (items.every(i => !i.description.trim())) { setError('Add at least one item.'); return false }
-    if (items.some(i => i.description.trim() && !(i.quantity > 0))) { setError('Quantity must be greater than 0.'); return false }
+    if (items.length === 0) { setError('Add at least one item.'); return false }
+    if (items.some(i => !i.description.trim())) { setError('Every line needs a description.'); return false }
+    if (items.some(i => !(i.quantity > 0))) { setError('Quantity must be greater than 0.'); return false }
     if (hasItemPriceErrors) { setError('Some line items are outside the allowed price range.'); return false }
     return true
   }
@@ -230,6 +252,7 @@ export default function InvoiceForm({
         quantity: i.quantity,
         unit_price: i.unit_price,
         amount: i.quantity * i.unit_price,
+        work_note: i.work_note.trim() || null,
       }))
 
     // Single transactional action: invoice header + all items succeed or fail
@@ -265,6 +288,7 @@ export default function InvoiceForm({
         quantity: i.quantity,
         unit_price: i.unit_price,
         amount: i.quantity * i.unit_price,
+        work_note: i.work_note.trim() || null,
       }))
 
     const result = await updateInvoiceAction(invoiceId, {
@@ -344,43 +368,57 @@ export default function InvoiceForm({
                 )}
               </button>
               {showRecipient && (
-                <div className="border-t border-gray-200 p-3 space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Bill To</div>
+                <div className="border-t border-gray-200 p-3 space-y-4">
+                  {/* Bill To */}
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Bill To</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs">Name</Label>
-                        <Input value={billToName} onChange={e => setBillToName(e.target.value)} placeholder="Recipient name" />
+                        <Input className="bg-white" value={billToName} onChange={e => setBillToName(e.target.value)} placeholder="Recipient name" />
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs">Contact person</Label>
-                        <Input value={billToContact} onChange={e => setBillToContact(e.target.value)} placeholder="Optional" />
+                        <Input className="bg-white" value={billToContact} onChange={e => setBillToContact(e.target.value)} placeholder="Optional" />
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs">Phone</Label>
-                        <Input value={billToPhone} onChange={e => setBillToPhone(e.target.value)} placeholder="Optional" />
+                        <Input className="bg-white" value={billToPhone} onChange={e => setBillToPhone(e.target.value)} placeholder="Optional" />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 sm:col-span-2">
                         <Label className="text-xs">Address</Label>
-                        <Textarea value={billingAddress} onChange={e => setBillingAddress(e.target.value)} rows={3} placeholder="Billing address" />
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Deliver To</div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Name</Label>
-                        <Input value={shipToName} onChange={e => setShipToName(e.target.value)} placeholder="Recipient name" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Contact person</Label>
-                        <Input value={shipToContact} onChange={e => setShipToContact(e.target.value)} placeholder="Optional" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Address</Label>
-                        <Textarea value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} rows={6} placeholder="Delivery address (leave empty to hide Deliver To block)" />
+                        <Textarea className="bg-white" value={billingAddress} onChange={e => setBillingAddress(e.target.value)} rows={2} placeholder="Billing address" />
                       </div>
                     </div>
                   </div>
+
+                  {/* Deliver-to toggle */}
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                    <Checkbox checked={shipDifferent} onCheckedChange={v => handleShipDifferentChange(v === true)} />
+                    Deliver to a different address
+                  </label>
+
+                  {/* Deliver To (only when it differs from billing) */}
+                  {shipDifferent && (
+                    <div className="space-y-2 rounded-md border border-dashed border-gray-300 p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Deliver To</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Name</Label>
+                          <Input className="bg-white" value={shipToName} onChange={e => setShipToName(e.target.value)} placeholder="Recipient name" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Contact person</Label>
+                          <Input className="bg-white" value={shipToContact} onChange={e => setShipToContact(e.target.value)} placeholder="Optional" />
+                        </div>
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <Label className="text-xs">Address</Label>
+                          <Textarea className="bg-white" value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} rows={2} placeholder="Delivery address" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between pt-1">
                     <p className="text-xs text-gray-500">Edits apply to this invoice only.</p>
                     {recipientDirty && (
@@ -443,103 +481,161 @@ export default function InvoiceForm({
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
           <CardTitle className="text-base">Line Items</CardTitle>
-          <Button variant="outline" size="sm" onClick={addItem}><Plus className="h-4 w-4 mr-2" />Add Item</Button>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-12 gap-2 text-xs font-medium text-gray-400 px-1">
-            <span className="col-span-5">Description</span>
-            <span className="col-span-3">From catalog</span>
-            <span className="col-span-1 text-right">Qty</span>
-            <span className="col-span-2 text-right">Price (MYR)</span>
-            <span className="col-span-1"></span>
-          </div>
+          <ProductSearchAdd products={products} onAdd={addProduct} />
 
-          {items.map((item, i) => {
-            const product = item.product_id ? products.find(p => p.id === item.product_id) : null
-            const hasRange = product?.min_unit_price != null && product?.max_unit_price != null
-            // A catalog product with no min/max range is a fixed-price item: price is locked.
-            const isFixed = product != null && !hasRange
-            const priceError = itemPriceErrors[i]
-            return (
-              <div key={item.id ?? `new-${i}`} className="grid grid-cols-12 gap-2 items-start">
-                <Input
-                  className="col-span-5"
-                  placeholder="Description"
-                  value={item.description}
-                  onChange={e => updateItem(i, 'description', e.target.value)}
-                />
-                <Select
-                  value={item.product_id ?? ''}
-                  onValueChange={v => updateItem(i, 'product_id', v)}
-                >
-                  <SelectTrigger className="col-span-3 text-xs">
-                    <SelectValue placeholder="Pick catalog…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  className="col-span-1 text-right"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={item.quantity}
-                  onChange={e => updateItem(i, 'quantity', Math.max(1, Math.floor(parseFloat(e.target.value) || 1)))}
-                />
-                <div className="col-span-2 space-y-1">
-                  <Input
-                    className={cn(
-                      'text-right',
-                      priceError && 'border-destructive focus-visible:ring-destructive',
-                      isFixed && 'bg-gray-100 text-gray-600',
-                    )}
-                    type="number"
-                    min={hasRange ? product!.min_unit_price! : 0}
-                    max={hasRange ? product!.max_unit_price! : undefined}
-                    step="0.01"
-                    value={item.unit_price}
-                    disabled={isFixed}
-                    aria-invalid={priceError ? true : undefined}
-                    onChange={e => updateItem(i, 'unit_price', parseFloat(e.target.value) || 0)}
-                  />
-                  {priceError ? (
-                    <p className="text-xs text-destructive text-right">{priceError}</p>
-                  ) : hasRange ? (
-                    <p className="text-xs text-gray-400 text-right">
-                      {formatCurrency(product!.min_unit_price!)} – {formatCurrency(product!.max_unit_price!)}
-                    </p>
-                  ) : isFixed ? (
-                    <p className="text-xs text-gray-400 text-right">Fixed price</p>
-                  ) : null}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="col-span-1 h-10 w-10 text-gray-400 hover:text-red-500"
-                  onClick={() => removeItem(i)}
-                  disabled={items.length === 1}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            )
-          })}
-
-          <Separator />
-
-          <div className="flex justify-end">
-            <div className="w-48 space-y-1">
-              <div className="flex justify-between text-sm font-semibold">
-                <span>Total</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
+          {items.length === 0 ? (
+            <div className="rounded-md border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+              Search your products above to start adding lines.
             </div>
-          </div>
+          ) : (
+            <div className="space-y-2">
+              {items.map((item, i) => {
+                const product = item.product_id ? products.find(p => p.id === item.product_id) : null
+                const hasRange = product?.min_unit_price != null && product?.max_unit_price != null
+                // A catalog product with no min/max range is a fixed-price item: price is locked.
+                const isFixed = product != null && !hasRange
+                const priceError = itemPriceErrors[i]
+                const lineTotal = item.quantity * item.unit_price
+                return (
+                  <div key={item.id ?? `new-${i}`} className="space-y-2.5 rounded-lg border border-gray-200 bg-white p-3">
+                    {/* Description (prints on the invoice) — inline-editable, defaults to the product name. */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <input
+                          className="w-full rounded bg-transparent px-1 py-0.5 text-sm font-medium text-gray-900 outline-none placeholder:font-normal placeholder:text-gray-400 hover:bg-gray-50 focus:bg-gray-50 focus:ring-1 focus:ring-gray-200"
+                          value={item.description}
+                          placeholder="Item description"
+                          onChange={e => updateItem(i, 'description', e.target.value)}
+                          aria-label="Line description"
+                        />
+                        {product && (
+                          <span className="ml-1 mt-1 inline-flex items-center gap-1 text-xs text-gray-400">
+                            <Tag className="h-3 w-3" />
+                            {product.name}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-gray-300 hover:text-red-500"
+                        onClick={() => removeItem(i)}
+                        aria-label="Remove line"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Qty · unit price · line total */}
+                    <div className="flex flex-wrap items-end gap-x-5 gap-y-2 pl-1">
+                      <div className="space-y-1">
+                        <span className="block text-xs text-gray-400">Qty</span>
+                        <div className="flex items-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 rounded-r-none"
+                            onClick={() => updateItem(i, 'quantity', Math.max(1, item.quantity - 1))}
+                            aria-label="Decrease quantity"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </Button>
+                          <Input
+                            className="h-9 w-12 rounded-none border-x-0 text-center"
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={item.quantity}
+                            onChange={e => updateItem(i, 'quantity', Math.max(1, Math.floor(parseFloat(e.target.value) || 1)))}
+                            aria-label="Quantity"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 rounded-l-none"
+                            onClick={() => updateItem(i, 'quantity', item.quantity + 1)}
+                            aria-label="Increase quantity"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="block text-xs text-gray-400">Unit price (MYR)</span>
+                        {isFixed ? (
+                          <div className="flex h-9 items-center text-sm text-gray-600">
+                            {formatCurrency(item.unit_price)}
+                            <span className="ml-1.5 text-xs text-gray-400">fixed</span>
+                          </div>
+                        ) : (
+                          <Input
+                            className={cn('h-9 w-28 text-right', priceError && 'border-destructive focus-visible:ring-destructive')}
+                            type="number"
+                            min={hasRange ? product!.min_unit_price! : 0}
+                            max={hasRange ? product!.max_unit_price! : undefined}
+                            step="0.01"
+                            value={item.unit_price}
+                            aria-invalid={priceError ? true : undefined}
+                            onChange={e => updateItem(i, 'unit_price', parseFloat(e.target.value) || 0)}
+                            aria-label="Unit price"
+                          />
+                        )}
+                      </div>
+
+                      <div className="ml-auto space-y-1 text-right">
+                        <span className="block text-xs text-gray-400">Line total</span>
+                        <div className="flex h-9 items-center justify-end text-sm font-semibold text-gray-900">
+                          {formatCurrency(lineTotal)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Price guidance / validation */}
+                    {priceError ? (
+                      <p className="pl-1 text-xs text-destructive">{priceError}</p>
+                    ) : hasRange ? (
+                      <p className="pl-1 text-xs text-gray-400">
+                        Allowed {formatCurrency(product!.min_unit_price!)} – {formatCurrency(product!.max_unit_price!)}
+                      </p>
+                    ) : null}
+
+                    {/* Internal remark (lab note) — captured to work_note, not shown to the customer. */}
+                    <div className="flex items-center gap-1.5 border-t border-gray-100 pt-2">
+                      <StickyNote className="h-3.5 w-3.5 shrink-0 text-gray-300" />
+                      <input
+                        className="w-full bg-transparent text-xs text-gray-600 outline-none placeholder:text-gray-300"
+                        value={item.work_note}
+                        placeholder="Internal remark for the lab (optional — not shown to customer)"
+                        onChange={e => updateItem(i, 'work_note', e.target.value)}
+                        aria-label="Internal remark"
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {items.length > 0 && (
+            <>
+              <Separator />
+              <div className="flex justify-end">
+                <div className="w-48 space-y-1">
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span>Total</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

@@ -4,6 +4,7 @@ import {
   encodeWork, decodeWork, workOptions, workOptionsForItem,
   workLabel, workColor, labelForValue, colorForValue,
   orderedGroupKeys, STAGE_DEFAULT_COLOR,
+  stageProgress, dotColorClass,
 } from '@/lib/work-stages'
 import { WORK_STATUS_LABELS, WORK_STATUS_COLORS } from '@/lib/work-status'
 
@@ -108,5 +109,34 @@ describe('orderedGroupKeys', () => {
     // refactor that gated the flush on `ready` being present would drop this group.
     const present = ['received', 'stage:old']
     expect(orderedGroupKeys(active, present)).toEqual(['received', 'stage:old'])
+  })
+})
+
+describe('stageProgress', () => {
+  it('returns null for any non-in-progress status', () => {
+    for (const ws of ['received', 'ready', 'delivered', 'on_hold'] as WorkStatus[]) {
+      expect(stageProgress(active, ws, null)).toBeNull()
+    }
+  })
+  it('gives the 0-based index + total for a staged in-progress item', () => {
+    expect(stageProgress(active, 'in_progress', 's1')).toEqual({ index: 0, total: 2 })
+    expect(stageProgress(active, 'in_progress', 's2')).toEqual({ index: 1, total: 2 })
+  })
+  it('is indeterminate (index -1) for bare in-progress or a retired/unknown stage', () => {
+    expect(stageProgress(active, 'in_progress', null)).toEqual({ index: -1, total: 2 })
+    expect(stageProgress(active, 'in_progress', 'gone')).toEqual({ index: -1, total: 2 })
+  })
+})
+
+describe('dotColorClass', () => {
+  it('derives a saturated dot from a pale pill class', () => {
+    expect(dotColorClass('bg-blue-100 text-blue-700')).toBe('bg-blue-500')
+    expect(dotColorClass('bg-amber-100 text-amber-700')).toBe('bg-amber-500')
+  })
+  it('handles the delivered pill (bg-gray-50 + ring)', () => {
+    expect(dotColorClass('bg-gray-50 text-gray-500 ring-1 ring-inset ring-gray-200')).toBe('bg-gray-500')
+  })
+  it('falls back to a neutral dot when no bg color is found', () => {
+    expect(dotColorClass('text-only-no-bg')).toBe('bg-gray-400')
   })
 })

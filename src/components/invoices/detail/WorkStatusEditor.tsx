@@ -10,11 +10,12 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/feedback/toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDate, cn } from '@/lib/utils'
 import { ChevronRight } from 'lucide-react'
 import { WorkStatusBadge } from '@/components/work-status-badge'
-import { encodeWork, decodeWork, workOptionsForItem, workLabel, workColor } from '@/lib/work-stages'
+import { WorkStatusSelect } from '@/components/work-status-select'
+import { WorkStageStepper } from '@/components/work/WorkStageStepper'
+import { encodeWork, decodeWork, workLabel, workColor } from '@/lib/work-stages'
 import { updateWorkStatusAction } from '@/data/invoice-actions'
 import type { InvoiceItem, InvoiceItemStatusHistory, WorkStage } from '@/lib/database.types'
 
@@ -30,6 +31,7 @@ export function WorkStatusEditor({ items, history, stages }: WorkStatusEditorPro
   const [historyOpen, setHistoryOpen] = useState(false)
 
   const stagesById = new Map(stages.map(s => [s.id, s]))
+  const activeStages = stages.filter(s => s.is_active)
 
   const updateWorkStatus = async (itemId: string, value: string) => {
     const { work_status, stage_id } = decodeWork(value)
@@ -58,24 +60,19 @@ export function WorkStatusEditor({ items, history, stages }: WorkStatusEditorPro
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.description}</TableCell>
                 <TableCell>
-                  <Select
+                  <WorkStatusSelect
                     value={encodeWork(item.work_status, item.stage_id)}
                     onValueChange={v => updateWorkStatus(item.id, v)}
-                  >
-                    <SelectTrigger
-                      className={cn(
-                        'h-8 w-44 text-xs font-medium border-transparent',
-                        workColor(item.work_status, item.stage_id, stagesById)
-                      )}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workOptionsForItem(stages.filter(s => s.is_active), item.work_status, item.stage_id, stagesById).map(o => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    activeStages={activeStages}
+                    workStatus={item.work_status}
+                    stageId={item.stage_id}
+                    stagesById={stagesById}
+                  />
+                  <WorkStageStepper
+                    activeStages={activeStages}
+                    workStatus={item.work_status}
+                    stageId={item.stage_id}
+                  />
                 </TableCell>
                 <TableCell className="text-right text-xs text-gray-500">
                   {formatDate(item.work_status_updated_at)}

@@ -90,6 +90,8 @@ export type InvoicePayload = {
 }
 
 // Line item the create/update RPC diffs. `id` is null for new rows.
+// `work_note` is the per-line internal remark (lab notes); the RPCs persist it
+// onto invoice_items.work_note. Optional/nullable — empty becomes NULL.
 export type InvoiceItemPayload = {
   id?: string | null
   product_id: string | null
@@ -97,6 +99,7 @@ export type InvoiceItemPayload = {
   quantity: number
   unit_price: number
   amount: number
+  work_note?: string | null
 }
 
 // Revalidate both the list and the specific invoice's detail page.

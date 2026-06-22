@@ -115,3 +115,26 @@ export function orderedGroupKeys(activeStages: WorkStage[], present: string[]): 
   }
   return out
 }
+
+// In-Progress substate position, for the stage stepper. Returns null unless the
+// item is in_progress. `index` is the 0-based position of `stage_id` among the
+// active stages, or -1 when the stage is missing/retired (indeterminate);
+// `total` is the active stage count.
+export type StageProgress = { index: number; total: number }
+export function stageProgress(
+  activeStages: WorkStage[],
+  work_status: WorkStatus,
+  stage_id: string | null,
+): StageProgress | null {
+  if (work_status !== 'in_progress') return null
+  const index = stage_id ? activeStages.findIndex(s => s.id === stage_id) : -1
+  return { index, total: activeStages.length }
+}
+
+// Derive a saturated dot color (`bg-<hue>-500`) from a pale pill class
+// (`bg-<hue>-100 text-<hue>-700`). Falls back to a neutral dot when no bg hue
+// is found. Used to render visible color swatches in the status dropdown.
+export function dotColorClass(pillColor: string): string {
+  const m = pillColor.match(/bg-([a-z]+)-\d+/)
+  return m ? `bg-${m[1]}-500` : 'bg-gray-400'
+}
