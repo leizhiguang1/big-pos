@@ -22,7 +22,7 @@ export default async function DashboardPage() {
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
   const nextMonthStart = format(startOfMonth(addMonths(now, 1)), 'yyyy-MM-dd')
   const revenue = statsInvoices
-    .filter(i => countsAsRevenue(i) && i.due_date >= monthStart && i.due_date < nextMonthStart)
+    .filter(i => countsAsRevenue(i) && i.invoice_date >= monthStart && i.invoice_date < nextMonthStart)
     .reduce((s, i) => s + Number(i.total), 0)
   const outstanding = statsInvoices
     .filter(i => isOutstanding(i))
