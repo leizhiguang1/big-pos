@@ -13,12 +13,8 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { listViewState } from '@/lib/list-view-state'
 import { statusBadgeVariant } from '@/lib/status-badge'
 import { FileText, Plus, Search } from 'lucide-react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn, formatCurrency, formatDate, todayISODate } from '@/lib/utils'
-import type { WorkStatus } from '@/lib/database.types'
 import {
-  WORK_STATUSES,
-  WORK_STATUS_LABELS,
   dominantWorkStatus,
 } from '@/lib/work-status'
 import { WorkStatusBadge } from '@/components/work-status-badge'
@@ -26,31 +22,38 @@ import { DEFAULT_COLOR } from '@/lib/service-status'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
 import type { InvoiceListRow } from '@/data/invoices'
 
+type ViewKey = 'all' | 'drafts' | 'unpaid' | 'overdue' | 'in_production' | 'ready' | 'voided'
+
+const VIEWS: { key: ViewKey; label: string; match: (inv: InvoiceListRow, today: string) => boolean }[] = [
+  { key: 'all', label: 'All', match: () => true },
+  { key: 'drafts', label: 'Drafts', match: inv => !isVoided(inv) && inv.status === 'draft' },
+  { key: 'unpaid', label: 'Awaiting payment', match: inv => !isVoided(inv) && ['sent', 'partial', 'overdue'].includes(inv.status) },
+  { key: 'overdue', label: 'Overdue', match: (inv, today) => isOverdue(inv, today) },
+  { key: 'in_production', label: 'In production', match: inv => {
+      const d = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
+      return !isVoided(inv) && d != null && d !== 'ready' && d !== 'delivered'
+    } },
+  { key: 'ready', label: 'Ready to deliver', match: inv => dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status)) === 'ready' },
+  { key: 'voided', label: 'Voided', match: inv => isVoided(inv) },
+]
 
 export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) {
   const router = useRouter()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [workFilter, setWorkFilter] = useState<'all' | WorkStatus>('all')
+  const [viewKey, setViewKey] = useState<ViewKey>('all')
   const today = todayISODate()
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
+    const view = VIEWS.find(v => v.key === viewKey) ?? VIEWS[0]
     return invoices.filter(inv => {
       const matchSearch =
         inv.invoice_number.toLowerCase().includes(q) ||
-        (inv.customers?.clinic_name ?? '').toLowerCase().includes(q)
-      const matchStatus =
-        statusFilter === 'all' ? true :
-        statusFilter === 'void' ? isVoided(inv) :
-        statusFilter === 'overdue' ? isOverdue(inv, today) :
-        (!isVoided(inv) && inv.status === statusFilter)
-      const matchWork =
-        workFilter === 'all' ||
-        (inv.invoice_items ?? []).some(it => it.work_status === workFilter)
-      return matchSearch && matchStatus && matchWork
+        (inv.customers?.clinic_name ?? '').toLowerCase().includes(q) ||
+        (inv.patient ?? '').toLowerCase().includes(q)
+      return matchSearch && view.match(inv, today)
     })
-  }, [search, statusFilter, workFilter, invoices, today])
+  }, [search, viewKey, invoices, today])
 
   const columns: Column<InvoiceListRow>[] = [
     { key: 'number', header: 'Invoice #', cell: inv => <span className="font-medium text-primary">{inv.invoice_number}</span> },
@@ -93,13 +96,14 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
     },
   ]
 
-  const hasQuery = search.trim() !== '' || statusFilter !== 'all' || workFilter !== 'all'
-  const view = listViewState({ loading: false, total: invoices.length, filtered: filtered.length, hasQuery })
+  const hasQuery = search.trim() !== '' || viewKey !== 'all'
+  const viewState = listViewState({ loading: false, total: invoices.length, filtered: filtered.length, hasQuery })
+  const activeViewLabel = VIEWS.find(v => v.key === viewKey)?.label ?? 'All'
   const emptyState = (
     <EmptyState
       icon={<FileText className="h-8 w-8" />}
-      title={view === 'empty-no-results' ? 'No invoices match your filters' : 'No invoices yet'}
-      description={view === 'empty-no-results' ? 'Try a different search or filter.' : 'Create your first invoice to get started.'}
+      title={viewState === 'empty-no-results' ? `No invoices in "${activeViewLabel}"` : 'No invoices yet'}
+      description={viewState === 'empty-no-results' ? 'Try a different search or view.' : 'Create your first invoice to get started.'}
     />
   )
 
@@ -115,36 +119,30 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search invoice # or customer…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="All statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All payment</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="sent">Sent</SelectItem>
-            <SelectItem value="partial">Partial</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
-            <SelectItem value="void">Voided</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={workFilter} onValueChange={v => setWorkFilter(v as 'all' | WorkStatus)}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="All work" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All work</SelectItem>
-            {WORK_STATUSES.map(s => (
-              <SelectItem key={s} value={s}>{WORK_STATUS_LABELS[s]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {VIEWS.map(v => {
+          const count = invoices.filter(inv => v.match(inv, today)).length
+          const active = v.key === viewKey
+          return (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => setViewKey(v.key)}
+              className={cn(
+                'shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
+                active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+              )}
+            >
+              {v.label}
+              <span className={cn('ml-1.5 text-xs', active ? 'text-primary-foreground/70' : 'text-muted-foreground/60')}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Search invoice #, customer, or patient…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
       </div>
 
       <Card>
