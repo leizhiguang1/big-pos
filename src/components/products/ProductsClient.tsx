@@ -91,6 +91,10 @@ export function ProductsClient({ products, units }: { products: Product[]; units
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<'active' | 'inactive' | 'all'>('active')
+  const visibleProducts = products.filter(p =>
+    activeFilter === 'all' ? true : activeFilter === 'active' ? p.active : !p.active,
+  )
 
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<FormData>({
     // zod's `coerce.number()` types the resolver input as `unknown`; cast to the
@@ -110,7 +114,7 @@ export function ProductsClient({ products, units }: { products: Product[]; units
     totalPages,
     pageStart,
     pageEnd,
-  } = usePaginatedList(products, { searchFn: productMatchesQuery, pageSize: 10 })
+  } = usePaginatedList(visibleProducts, { searchFn: productMatchesQuery, pageSize: 10 })
 
   const openNew = () => {
     setEditing(null)
@@ -237,7 +241,7 @@ export function ProductsClient({ products, units }: { products: Product[]; units
 
   const view = listViewState({
     loading: false,
-    total: products.length,
+    total: visibleProducts.length,
     filtered: filteredCount,
     hasQuery: query.trim().length > 0,
   })
@@ -261,7 +265,16 @@ export function ProductsClient({ products, units }: { products: Product[]; units
         {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Product</Button>}
       </div>
 
-      <ListToolbar value={query} onChange={setQuery} placeholder="Search products…" />
+      <ListToolbar value={query} onChange={setQuery} placeholder="Search products…">
+        <Select value={activeFilter} onValueChange={v => setActiveFilter(v as 'active' | 'inactive' | 'all')}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active only</SelectItem>
+            <SelectItem value="inactive">Inactive only</SelectItem>
+            <SelectItem value="all">All</SelectItem>
+          </SelectContent>
+        </Select>
+      </ListToolbar>
 
       <Card>
         <CardContent className="p-0">
