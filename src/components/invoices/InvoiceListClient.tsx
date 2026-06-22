@@ -7,7 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { DataTable } from '@/components/ui/data-table'
+import type { Column } from '@/lib/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
+import { listViewState } from '@/lib/list-view-state'
+import { statusBadgeVariant } from '@/lib/status-badge'
+import { FileText } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency, formatDate, todayISODate } from '@/lib/utils'
 import { Plus, Search } from 'lucide-react'
@@ -23,9 +28,6 @@ import { cn } from '@/lib/utils'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
 import type { InvoiceListRow } from '@/data/invoices'
 
-const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
-  draft: 'secondary', sent: 'info', partial: 'warning', paid: 'success', overdue: 'destructive',
-}
 
 export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) {
   const router = useRouter()
@@ -51,6 +53,57 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
       return matchSearch && matchStatus && matchWork
     })
   }, [search, statusFilter, workFilter, invoices, today])
+
+  const columns: Column<InvoiceListRow>[] = [
+    { key: 'number', header: 'Invoice #', cell: inv => <span className="font-medium text-primary">{inv.invoice_number}</span> },
+    { key: 'customer', header: 'Customer', cell: inv => <span className="text-gray-700">{inv.customers?.clinic_name ?? '—'}</span> },
+    { key: 'patient', header: 'Patient', cell: inv => <span className="text-gray-700">{inv.patient ?? '—'}</span> },
+    { key: 'date', header: 'Date', cell: inv => <span className="text-sm text-gray-500">{formatDate(inv.invoice_date)}</span> },
+    { key: 'due', header: 'Due Date', cell: inv => <span className="text-sm text-gray-500">{formatDate(inv.due_date)}</span> },
+    { key: 'amount', header: 'Amount', align: 'right', cell: inv => <span className="font-medium tabular-nums">{formatCurrency(inv.total)}</span> },
+    {
+      key: 'payment',
+      header: 'Payment',
+      cell: inv =>
+        isVoided(inv) ? (
+          <Badge variant="destructive" className="uppercase">Voided</Badge>
+        ) : isOverdue(inv, today) ? (
+          <Badge variant="destructive" className="capitalize">Overdue</Badge>
+        ) : (
+          <Badge variant={statusBadgeVariant('payment', inv.status)} className="capitalize">{inv.status}</Badge>
+        ),
+    },
+    {
+      key: 'work',
+      header: 'Work',
+      cell: inv => {
+        const dominant = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
+        return dominant ? <WorkStatusBadge status={dominant} /> : <span className="text-xs text-gray-400">—</span>
+      },
+    },
+    {
+      key: 'service',
+      header: 'Service',
+      cell: inv =>
+        inv.service_statuses ? (
+          <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', inv.service_statuses.color ?? DEFAULT_COLOR)}>
+            {inv.service_statuses.label}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        ),
+    },
+  ]
+
+  const hasQuery = search.trim() !== '' || statusFilter !== 'all' || workFilter !== 'all'
+  const view = listViewState({ loading: false, total: invoices.length, filtered: filtered.length, hasQuery })
+  const emptyState = (
+    <EmptyState
+      icon={<FileText className="h-8 w-8" />}
+      title={view === 'empty-no-results' ? 'No invoices match your filters' : 'No invoices yet'}
+      description={view === 'empty-no-results' ? 'Try a different search or filter.' : 'Create your first invoice to get started.'}
+    />
+  )
 
   return (
     <div className="space-y-6">
@@ -98,62 +151,13 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Patient</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead>Work</TableHead>
-                <TableHead>Service</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-400">No invoices found</TableCell></TableRow>}
-              {filtered.map(inv => {
-                const dominant = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
-                const service = inv.service_statuses
-                const overdue = isOverdue(inv, today)
-                return (
-                  <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
-                    <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
-                    <TableCell className="text-gray-700">{inv.customers?.clinic_name ?? '—'}</TableCell>
-                    <TableCell className="text-gray-700">{inv.patient ?? '—'}</TableCell>
-                    <TableCell className="text-gray-500 text-sm">{formatDate(inv.invoice_date)}</TableCell>
-                    <TableCell className="text-gray-500 text-sm">{formatDate(inv.due_date)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
-                    <TableCell>
-                      {isVoided(inv)
-                        ? <Badge variant="destructive" className="uppercase">Voided</Badge>
-                        : overdue
-                          ? <Badge variant="destructive" className="capitalize">Overdue</Badge>
-                          : <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'} className="capitalize">{inv.status}</Badge>}
-                    </TableCell>
-                    <TableCell>
-                      {dominant ? (
-                        <WorkStatusBadge status={dominant} />
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {service ? (
-                        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', service.color ?? DEFAULT_COLOR)}>
-                          {service.label}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={columns}
+            rows={filtered}
+            rowKey={inv => inv.id}
+            onRowClick={inv => router.push(`/invoices/${inv.id}`)}
+            empty={emptyState}
+          />
         </CardContent>
       </Card>
     </div>
