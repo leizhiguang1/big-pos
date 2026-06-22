@@ -16,7 +16,12 @@ export default function CommandPalette() {
   useEffect(() => {
     if (open && !loadedRef.current) {
       loadedRef.current = true
-      getCommandItems().then(setItems)
+      getCommandItems()
+        .then(setItems)
+        .catch(() => {
+          // Let the next open retry rather than staying permanently empty.
+          loadedRef.current = false
+        })
     }
   }, [open])
 
