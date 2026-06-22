@@ -12,6 +12,7 @@ export interface PageResult<T> {
 
 /** Pure slice + clamp math for client-side pagination. */
 export function paginate<T>(items: T[], page: number, pageSize: number): PageResult<T> {
+  pageSize = Math.max(1, pageSize)
   const total = items.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const clamped = Math.min(Math.max(1, page), totalPages)

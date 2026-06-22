@@ -35,4 +35,11 @@ describe('paginate', () => {
     expect(r.page).toBe(1)
     expect(r.pageStart).toBe(1)
   })
+  it('treats a non-positive pageSize as 1', () => {
+    const r = paginate([1, 2, 3], 1, 0)
+    expect(r.pageItems).toEqual([1])
+    expect(r.totalPages).toBe(3)
+    expect(r.pageStart).toBe(1)
+    expect(r.pageEnd).toBe(1)
+  })
 })
