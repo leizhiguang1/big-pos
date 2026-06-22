@@ -10,7 +10,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard, Users, FileText, Wrench, Package, BarChart3,
-  ClipboardList, ListChecks, UserCog, ShieldCheck,
+  ClipboardList, ListChecks, UserCog, ShieldCheck, Ruler,
 } from 'lucide-react'
 import type { Permission } from '@/domain/permissions'
 
@@ -43,6 +43,7 @@ export const NAV: NavEntry[] = [
   // Configuration & administration — inside Settings.
   { href: '/settings/service-statuses', label: 'Service Statuses', icon: ClipboardList, area: 'settings', group: 'Lab Setup', permission: 'settings.manage' },
   { href: '/settings/work-stages', label: 'Work Stages', icon: ListChecks, area: 'settings', group: 'Lab Setup', permission: 'settings.manage' },
+  { href: '/settings/units', label: 'Units', icon: Ruler, area: 'settings', group: 'Lab Setup', permission: 'settings.manage' },
   { href: '/settings/employees', label: 'Employees', icon: UserCog, area: 'settings', group: 'Team & Access', permission: 'staff.manage' },
   { href: '/settings/roles', label: 'Roles & Permissions', icon: ShieldCheck, area: 'settings', group: 'Team & Access', superadminOnly: true },
 ]
