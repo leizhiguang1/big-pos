@@ -1,5 +1,14 @@
 import { z } from 'zod'
 
+/**
+ * Normalize a product unit-of-measure: trim, lowercase, and drop a redundant
+ * leading "per " (the UI renders "per {unit}", so the stored value is the bare
+ * noun, e.g. "tooth"). Returns "" for blank or bare-"per " input.
+ */
+export function normalizeUnit(raw: string): string {
+  return raw.trim().toLowerCase().replace(/^per\s*/, '').trim()
+}
+
 export const lineItemSchema = z.object({
   product_id: z.string().uuid().nullable(),
   description: z.string().min(1),
@@ -34,7 +43,10 @@ export const productInputSchema = z
     name: z.string().min(1, 'Name is required'),
     description: z.string().nullable(),
     unit_price: z.number().min(0),
-    unit: z.string().min(1, 'Unit is required'),
+    unit: z
+      .string()
+      .transform(normalizeUnit)
+      .refine((v) => v.length > 0, 'Unit is required'),
     min_unit_price: z.number().min(0).nullable(),
     max_unit_price: z.number().min(0).nullable(),
   })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { paymentInputSchema, invoiceInputSchema, customerInputSchema, productInputSchema } from './schemas'
+import { paymentInputSchema, invoiceInputSchema, customerInputSchema, productInputSchema, normalizeUnit } from './schemas'
 
 const product = (over: Record<string, unknown> = {}) => ({
   name: 'Crown', description: null, unit_price: 100, unit: 'per unit',
@@ -28,6 +28,27 @@ describe('schemas', () => {
     expect(productInputSchema.safeParse(product({ min_unit_price: 150, max_unit_price: 50 })).success).toBe(false))
   it('requires a product name and unit', () => {
     expect(productInputSchema.safeParse(product({ name: '' })).success).toBe(false)
+    expect(productInputSchema.safeParse(product({ unit: '' })).success).toBe(false)
+  })
+
+  it('normalizeUnit strips a leading "per " and lowercases', () => {
+    expect(normalizeUnit('per unit')).toBe('unit')
+    expect(normalizeUnit('Per Tooth')).toBe('tooth')
+    expect(normalizeUnit('  per   arch ')).toBe('arch')
+    expect(normalizeUnit('set')).toBe('set')
+    expect(normalizeUnit('PER SET')).toBe('set')
+  })
+  it('normalizeUnit returns empty for blank or bare "per " input', () => {
+    expect(normalizeUnit('   ')).toBe('')
+    expect(normalizeUnit('per ')).toBe('')
+  })
+  it('productInputSchema normalizes the unit on parse', () => {
+    const parsed = productInputSchema.safeParse(product({ unit: 'Per Tooth' }))
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data.unit).toBe('tooth')
+  })
+  it('productInputSchema rejects a unit that normalizes to empty', () => {
+    expect(productInputSchema.safeParse(product({ unit: 'per ' })).success).toBe(false)
     expect(productInputSchema.safeParse(product({ unit: '' })).success).toBe(false)
   })
 })
