@@ -33,11 +33,11 @@ export function CustomerListClient({ customers }: { customers: Customer[] }) {
   }, [search, customers])
 
   const columns: Column<Customer>[] = [
-    { key: 'clinic', header: 'Clinic / Name', cell: c => <span className="font-medium text-gray-900">{c.clinic_name}</span> },
-    { key: 'contact', header: 'Contact Person', cell: c => <span className="text-gray-600">{c.contact_person ?? '—'}</span> },
-    { key: 'phone', header: 'Phone', cell: c => <span className="text-gray-600">{c.phone ?? '—'}</span> },
-    { key: 'email', header: 'Email', cell: c => <span className="text-gray-600">{c.email ?? '—'}</span> },
-    { key: 'registered', header: 'Registered', cell: c => <span className="text-sm text-gray-400">{formatDate(c.created_at)}</span> },
+    { key: 'clinic', header: 'Clinic / Name', cell: c => <span className="font-medium text-foreground">{c.clinic_name}</span> },
+    { key: 'contact', header: 'Contact Person', cell: c => <span className="text-muted-foreground">{c.contact_person ?? '—'}</span> },
+    { key: 'phone', header: 'Phone', cell: c => <span className="text-muted-foreground">{c.phone ?? '—'}</span> },
+    { key: 'email', header: 'Email', cell: c => <span className="text-muted-foreground">{c.email ?? '—'}</span> },
+    { key: 'registered', header: 'Registered', cell: c => <span className="text-sm text-muted-foreground">{formatDate(c.created_at)}</span> },
   ]
 
   const view = listViewState({ loading: false, total: customers.length, filtered: filtered.length, hasQuery: search.trim() !== '' })
@@ -53,8 +53,8 @@ export function CustomerListClient({ customers }: { customers: Customer[] }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{customers.length} registered</p>
+          <h1 className="text-2xl font-bold text-foreground">Customers</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{customers.length} registered</p>
         </div>
         {hasPermission('customers.edit') && (
           <Button asChild>
@@ -64,7 +64,7 @@ export function CustomerListClient({ customers }: { customers: Customer[] }) {
       </div>
 
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search clinic, contact or phone…"
           value={search}

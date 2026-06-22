@@ -119,8 +119,8 @@ export default function WorkStagesPage() {
             <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Work Stages</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Steps a job moves through while In Progress (Custom Tray, Try-in, Finish &amp; Polish…).</p>
+            <h1 className="text-2xl font-bold text-foreground">Work Stages</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Steps a job moves through while In Progress (Custom Tray, Try-in, Finish &amp; Polish…).</p>
           </div>
         </div>
         {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Stage</Button>}
@@ -138,8 +138,8 @@ export default function WorkStagesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
-              {!loading && rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-400">No stages yet</TableCell></TableRow>}
+              {loading && <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>}
+              {!loading && rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No stages yet</TableCell></TableRow>}
               {rows.map((s, i) => (
                 <TableRow key={s.id} className={s.is_active ? '' : 'opacity-50'}>
                   <TableCell>
@@ -159,7 +159,7 @@ export default function WorkStagesPage() {
                       {s.label}
                     </span>
                   </TableCell>
-                  <TableCell className="text-sm text-gray-500">{s.is_active ? 'Active' : 'Inactive'}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{s.is_active ? 'Active' : 'Inactive'}</TableCell>
                   <TableCell>
                     {canEdit && (
                       <div className="flex gap-1">
@@ -167,7 +167,7 @@ export default function WorkStagesPage() {
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleActive(s)}>
-                          {s.is_active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-gray-400" />}
+                          {s.is_active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
                         </Button>
                       </div>
                     )}
@@ -209,7 +209,7 @@ export default function WorkStagesPage() {
                 ))}
               </div>
               <div className="pt-2">
-                <p className="text-xs text-gray-500 mb-1.5">Preview</p>
+                <p className="text-xs text-muted-foreground mb-1.5">Preview</p>
                 <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', watchedColor)}>
                   {watchedLabel || 'Stage'}
                 </span>

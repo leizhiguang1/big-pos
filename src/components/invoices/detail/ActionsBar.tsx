@@ -154,7 +154,7 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
         </Button>
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{invoice.invoice_number}</h1>
+            <h1 className="text-2xl font-bold text-foreground">{invoice.invoice_number}</h1>
             {overdue
               ? <Badge variant="destructive" className="capitalize">Overdue</Badge>
               : <Badge variant={statusBadgeVariant('payment', invoice.status)} className="capitalize">{invoice.status}</Badge>}
@@ -163,7 +163,7 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
             )}
             {!voided && !canEdit && (
               <span
-                className="inline-flex items-center gap-1 text-xs text-gray-500"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground"
                 title="This invoice has been sent. You don't have permission to edit it."
               >
                 <Lock className="h-3 w-3" />Locked
@@ -230,7 +230,7 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
               <Ban className="h-5 w-5" /> Void Invoice
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Void <span className="font-semibold">{invoice.invoice_number}</span>? It will be excluded
             from revenue and reports. You can restore it later.
           </p>

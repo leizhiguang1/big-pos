@@ -223,7 +223,7 @@ export function ProductsClient({ products, units }: { products: Product[]; units
                   aria-label={p.active ? 'Deactivate product' : 'Activate product'}
                   onClick={() => toggleActive(p)}
                 >
-                  {p.active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-gray-400" />}
+                  {p.active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -255,8 +255,8 @@ export function ProductsClient({ products, units }: { products: Product[]; units
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products & Services</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Price catalog for invoicing</p>
+          <h1 className="text-2xl font-bold text-foreground">Products & Services</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Price catalog for invoicing</p>
         </div>
         {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Product</Button>}
       </div>
@@ -321,7 +321,7 @@ export function ProductsClient({ products, units }: { products: Product[]; units
                 </div>
               </div>
             )}
-            <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer select-none">
+            <label className="flex items-start gap-2 text-sm text-muted-foreground cursor-pointer select-none">
               <input
                 type="checkbox"
                 className="h-4 w-4 mt-0.5 rounded border-gray-300"
@@ -329,13 +329,13 @@ export function ProductsClient({ products, units }: { products: Product[]; units
               />
               <span>
                 Enable price range
-                <span className="block text-xs text-gray-400 font-normal">Lets invoices use any price between a min and a max for this product.</span>
+                <span className="block text-xs text-muted-foreground font-normal">Lets invoices use any price between a min and a max for this product.</span>
               </span>
             </label>
             <div className="space-y-2">
               <Label>Unit *</Label>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">per</span>
+                <span className="text-sm text-muted-foreground">per</span>
                 <div className="flex-1">
                   <Controller
                     control={control}

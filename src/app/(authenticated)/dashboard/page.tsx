@@ -29,8 +29,8 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Welcome back</p>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Welcome back</p>
         </div>
         <Button asChild>
           <Link href="/invoices/new"><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
@@ -40,17 +40,17 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Revenue (Month)</CardTitle>
-            <DollarSign className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Revenue (Month)</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(revenue)}</p>
+            <p className="text-2xl font-bold text-foreground">{formatCurrency(revenue)}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Outstanding</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding</CardTitle>
             <AlertCircle className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
@@ -60,21 +60,21 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Total Invoices</CardTitle>
-            <FileText className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Invoices</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-gray-900">{statsInvoices.length}</p>
+            <p className="text-2xl font-bold text-foreground">{statsInvoices.length}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Customers</CardTitle>
-            <Users className="h-4 w-4 text-gray-400" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Customers</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-gray-900">{customerCount}</p>
+            <p className="text-2xl font-bold text-foreground">{customerCount}</p>
           </CardContent>
         </Card>
       </div>

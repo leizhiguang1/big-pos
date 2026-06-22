@@ -19,15 +19,15 @@ export default function ProfileManager() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Manage your own login and see what your role can do.</p>
+        <h1 className="text-2xl font-bold text-foreground">My Profile</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Manage your own login and see what your role can do.</p>
       </div>
 
       <Card>
         <CardContent className="p-5 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Account</p>
-          <p className="text-sm text-gray-700">User ID: <span className="font-medium">{username}</span></p>
-          <p className="text-sm text-gray-700">Role: <span className="font-medium">{roleName}</span></p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account</p>
+          <p className="text-sm text-muted-foreground">User ID: <span className="font-medium">{username}</span></p>
+          <p className="text-sm text-muted-foreground">Role: <span className="font-medium">{roleName}</span></p>
         </CardContent>
       </Card>
 
@@ -36,15 +36,15 @@ export default function ProfileManager() {
 
       <Card>
         <CardContent className="p-5 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">What I can do</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What I can do</p>
           {isSuperadmin ? (
-            <p className="text-sm text-gray-700">All permissions (Super Admin).</p>
+            <p className="text-sm text-muted-foreground">All permissions (Super Admin).</p>
           ) : grantedLabels.length ? (
-            <ul className="text-sm text-gray-700 list-disc pl-5 space-y-0.5">
+            <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-0.5">
               {grantedLabels.map(l => <li key={l}>{l}</li>)}
             </ul>
           ) : (
-            <p className="text-sm text-gray-500">No special permissions assigned.</p>
+            <p className="text-sm text-muted-foreground">No special permissions assigned.</p>
           )}
         </CardContent>
       </Card>

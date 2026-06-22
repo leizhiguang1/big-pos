@@ -54,10 +54,10 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
 
   const columns: Column<InvoiceListRow>[] = [
     { key: 'number', header: 'Invoice #', cell: inv => <span className="font-medium text-primary">{inv.invoice_number}</span> },
-    { key: 'customer', header: 'Customer', cell: inv => <span className="text-gray-700">{inv.customers?.clinic_name ?? '—'}</span> },
-    { key: 'patient', header: 'Patient', cell: inv => <span className="text-gray-700">{inv.patient ?? '—'}</span> },
-    { key: 'date', header: 'Date', cell: inv => <span className="text-sm text-gray-500">{formatDate(inv.invoice_date)}</span> },
-    { key: 'due', header: 'Due Date', cell: inv => <span className="text-sm text-gray-500">{formatDate(inv.due_date)}</span> },
+    { key: 'customer', header: 'Customer', cell: inv => <span className="text-muted-foreground">{inv.customers?.clinic_name ?? '—'}</span> },
+    { key: 'patient', header: 'Patient', cell: inv => <span className="text-muted-foreground">{inv.patient ?? '—'}</span> },
+    { key: 'date', header: 'Date', cell: inv => <span className="text-sm text-muted-foreground">{formatDate(inv.invoice_date)}</span> },
+    { key: 'due', header: 'Due Date', cell: inv => <span className="text-sm text-muted-foreground">{formatDate(inv.due_date)}</span> },
     { key: 'amount', header: 'Amount', align: 'right', cell: inv => <span className="font-medium tabular-nums">{formatCurrency(inv.total)}</span> },
     {
       key: 'payment',
@@ -76,7 +76,7 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
       header: 'Work',
       cell: inv => {
         const dominant = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
-        return dominant ? <WorkStatusBadge status={dominant} /> : <span className="text-xs text-gray-400">—</span>
+        return dominant ? <WorkStatusBadge status={dominant} /> : <span className="text-xs text-muted-foreground">—</span>
       },
     },
     {
@@ -88,7 +88,7 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
             {inv.service_statuses.label}
           </span>
         ) : (
-          <span className="text-xs text-gray-400">—</span>
+          <span className="text-xs text-muted-foreground">—</span>
         ),
     },
   ]
@@ -107,8 +107,8 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{invoices.length} total</p>
+          <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{invoices.length} total</p>
         </div>
         <Button asChild>
           <Link href="/invoices/new"><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
@@ -117,7 +117,7 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search invoice # or customer…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>

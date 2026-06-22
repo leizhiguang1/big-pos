@@ -73,8 +73,8 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit Customer' : 'New Customer'}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Dental clinic or dentist details</p>
+          <h1 className="text-2xl font-bold text-foreground">{isEdit ? 'Edit Customer' : 'New Customer'}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Dental clinic or dentist details</p>
         </div>
       </div>
 

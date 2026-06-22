@@ -31,13 +31,13 @@ export function CustomerInvoiceHistory({ invoices }: { invoices: Invoice[] }) {
           </TableHeader>
           <TableBody>
             {invoices.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">No invoices yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No invoices yet</TableCell></TableRow>
             )}
             {invoices.map(inv => (
               <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
                 <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
-                <TableCell className="text-gray-500 text-sm">{formatDate(inv.invoice_date)}</TableCell>
-                <TableCell className="text-gray-500 text-sm">{formatDate(inv.due_date)}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">{formatDate(inv.invoice_date)}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">{formatDate(inv.due_date)}</TableCell>
                 <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
                 <TableCell>
                   {isVoided(inv)

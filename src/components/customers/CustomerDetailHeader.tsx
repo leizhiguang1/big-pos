@@ -28,8 +28,8 @@ export function CustomerDetailHeader({
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{clinicName}</h1>
-          {contactPerson && <p className="text-sm text-gray-500 mt-0.5">{contactPerson}</p>}
+          <h1 className="text-2xl font-bold text-foreground">{clinicName}</h1>
+          {contactPerson && <p className="text-sm text-muted-foreground mt-0.5">{contactPerson}</p>}
         </div>
       </div>
       <div className="flex gap-2">

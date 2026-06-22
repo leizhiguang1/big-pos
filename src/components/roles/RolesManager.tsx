@@ -64,8 +64,8 @@ export default function RolesManager() {
         <div className="flex items-center gap-3">
           <Link href="/settings"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Roles &amp; Permissions</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Create roles and choose what each one can do.</p>
+            <h1 className="text-2xl font-bold text-foreground">Roles &amp; Permissions</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Create roles and choose what each one can do.</p>
           </div>
         </div>
         <Button onClick={() => setDialog({ mode: 'create' })}><Plus className="h-4 w-4 mr-2" />New role</Button>
@@ -73,15 +73,15 @@ export default function RolesManager() {
 
       <Card>
         <CardContent className="p-0 divide-y">
-          {loading && <p className="text-center py-8 text-gray-400">Loading…</p>}
+          {loading && <p className="text-center py-8 text-muted-foreground">Loading…</p>}
           {!loading && rows.map(role => (
             <div key={role.id} className="flex items-center gap-4 px-5 py-4">
               <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{role.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-semibold text-foreground">{role.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   {role.is_system ? 'All permissions' : `${role.perms.size} permission${role.perms.size === 1 ? '' : 's'}`}
                   {' · '}{role.userCount} {role.userCount === 1 ? 'person' : 'people'}
                 </p>
@@ -218,22 +218,22 @@ function RoleDialog({
               return (
                 <div key={group.label}>
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{group.label}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
                     <button
                       type="button"
                       onClick={() => setGroup(keys, !groupSelected)}
-                      className="text-xs text-gray-400 hover:text-primary"
+                      className="text-xs text-muted-foreground hover:text-primary"
                     >
                       {groupSelected ? 'Clear' : 'Select all'}
                     </button>
                   </div>
                   <div className="space-y-2">
                     {group.permissions.map(p => (
-                      <label key={p.key} className="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer">
+                      <label key={p.key} className="flex items-start gap-2.5 text-sm text-muted-foreground cursor-pointer">
                         <Checkbox className="mt-0.5" checked={perms.has(p.key)} onCheckedChange={() => toggle(p.key)} />
                         <span>
                           {p.label}
-                          {p.description && <span className="block text-xs text-gray-400">{p.description}</span>}
+                          {p.description && <span className="block text-xs text-muted-foreground">{p.description}</span>}
                         </span>
                       </label>
                     ))}

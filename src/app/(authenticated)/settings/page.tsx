@@ -18,5 +18,5 @@ export default function SettingsIndex() {
     router.replace(first ?? '/dashboard')
   }, [loading, hasPermission, isSuperadmin, router])
 
-  return <p className="text-sm text-gray-400">Loading…</p>
+  return <p className="text-sm text-muted-foreground">Loading…</p>
 }

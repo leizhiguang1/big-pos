@@ -35,7 +35,7 @@ function SidebarContent({
   const linkClass = (active: boolean) =>
     cn(
       'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-      active ? 'bg-primary text-primary-foreground' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+      active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-gray-100 hover:text-foreground',
     )
 
   return (
@@ -44,7 +44,7 @@ function SidebarContent({
         <div className="flex items-center gap-3">
           <Image src="/logo-mark.png" alt="" width={36} height={36} className="w-9 h-9 flex-shrink-0 object-contain" />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">Chi Dental Lab</p>
+            <p className="text-sm font-semibold text-foreground truncate">Chi Dental Lab</p>
           </div>
         </div>
       </div>
@@ -56,11 +56,11 @@ function SidebarContent({
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('command-palette:open'))}
-          className="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 transition-colors"
+          className="flex w-full items-center gap-2 rounded-lg border border-border bg-gray-50 px-3 py-2 text-sm text-muted-foreground hover:bg-gray-100 transition-colors"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left">Search…</span>
-          <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-400 font-sans">
+          <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border bg-card px-1.5 py-0.5 text-xs text-muted-foreground font-sans">
             ⌘K
           </kbd>
         </button>
@@ -100,13 +100,13 @@ function SidebarContent({
             activeHref === '/profile' ? 'bg-primary/10' : 'hover:bg-gray-100',
           )}
         >
-          <p className="text-sm font-medium text-gray-700 truncate">{username}</p>
-          <p className="text-xs text-gray-400 capitalize">{roleName}</p>
+          <p className="text-sm font-medium text-muted-foreground truncate">{username}</p>
+          <p className="text-xs text-muted-foreground capitalize">{roleName}</p>
         </Link>
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start text-gray-600 hover:text-red-600 hover:bg-red-50"
+          className="w-full justify-start text-muted-foreground hover:text-red-600 hover:bg-red-50"
           onClick={onSignOut}
         >
           <LogOut className="h-4 w-4 mr-2" />
@@ -155,7 +155,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-60 bg-white border-r border-gray-200 flex-shrink-0">
+      <aside className="hidden md:flex flex-col w-60 bg-card border-r border-border flex-shrink-0">
         <SidebarContent
           items={items}
           activeHref={activeHref}
@@ -171,7 +171,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={closeSidebar} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50">
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-card shadow-xl z-50">
             <SidebarContent
               items={items}
               activeHref={activeHref}
@@ -188,12 +188,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-card border-b border-border">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
           <Image src="/logo-mark.png" alt="" width={24} height={24} className="w-6 h-6 object-contain" />
-          <span className="text-sm font-semibold text-gray-900">{COMPANY.name}</span>
+          <span className="text-sm font-semibold text-foreground">{COMPANY.name}</span>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">

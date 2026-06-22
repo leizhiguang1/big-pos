@@ -27,14 +27,14 @@ export function DashboardRecentInvoices({ invoices }: { invoices: DashboardRecen
       <TableBody>
         {invoices.length === 0 && (
           <TableRow>
-            <TableCell colSpan={5} className="text-center text-gray-400 py-8">No invoices yet</TableCell>
+            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No invoices yet</TableCell>
           </TableRow>
         )}
         {invoices.map(inv => (
           <TableRow key={inv.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${inv.id}`)}>
             <TableCell className="font-medium text-primary">{inv.invoice_number}</TableCell>
             <TableCell>{inv.customers?.clinic_name ?? '—'}</TableCell>
-            <TableCell className="text-gray-500">{formatDate(inv.invoice_date)}</TableCell>
+            <TableCell className="text-muted-foreground">{formatDate(inv.invoice_date)}</TableCell>
             <TableCell className="font-medium">{formatCurrency(inv.total)}</TableCell>
             <TableCell>
               {isVoided(inv)

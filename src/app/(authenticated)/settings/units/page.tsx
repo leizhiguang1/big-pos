@@ -118,8 +118,8 @@ export default function UnitsPage() {
             <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Units</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Units of measure for products (per tooth, per arch, per case…).</p>
+            <h1 className="text-2xl font-bold text-foreground">Units</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Units of measure for products (per tooth, per arch, per case…).</p>
           </div>
         </div>
         {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Unit</Button>}
@@ -137,8 +137,8 @@ export default function UnitsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
-              {!loading && rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-8 text-gray-400">No units yet</TableCell></TableRow>}
+              {loading && <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>}
+              {!loading && rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No units yet</TableCell></TableRow>}
               {rows.map((u, i) => (
                 <TableRow key={u.id} className={u.is_active ? '' : 'opacity-50'}>
                   <TableCell>
@@ -164,7 +164,7 @@ export default function UnitsPage() {
                     )}
                   </TableCell>
                   <TableCell className="font-medium">{u.label}</TableCell>
-                  <TableCell className="text-sm text-gray-500">{u.is_active ? 'Active' : 'Inactive'}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{u.is_active ? 'Active' : 'Inactive'}</TableCell>
                   <TableCell>
                     {canEdit && (
                       <div className="flex gap-1">
@@ -179,7 +179,7 @@ export default function UnitsPage() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={u.is_active ? 'Deactivate unit' : 'Activate unit'} onClick={() => toggleActive(u)}>
-                              {u.is_active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-gray-400" />}
+                              {u.is_active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>{u.is_active ? 'Active — click to deactivate' : 'Inactive — click to activate'}</TooltipContent>

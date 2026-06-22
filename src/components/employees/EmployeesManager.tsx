@@ -92,8 +92,8 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
             <TooltipContent>Back to Settings</TooltipContent>
           </Tooltip>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Add staff logins, reset PINs, and manage access.</p>
+            <h1 className="text-2xl font-bold text-foreground">Employees</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Add staff logins, reset PINs, and manage access.</p>
           </div>
         </div>
         <Button onClick={() => setDialog({ mode: 'create' })}><Plus className="h-4 w-4 mr-2" />Add Employee</Button>
@@ -112,19 +112,19 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">Loading…</TableCell></TableRow>}
-              {!loading && rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">No employees yet</TableCell></TableRow>}
+              {loading && <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>}
+              {!loading && rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No employees yet</TableCell></TableRow>}
               {rows.map(p => (
                 <TableRow key={p.id} className={p.active ? '' : 'opacity-60'}>
-                  <TableCell className="font-medium text-gray-900">
+                  <TableCell className="font-medium text-foreground">
                     {p.full_name}
-                    {p.id === currentUserId && <span className="ml-2 text-xs text-gray-400">(you)</span>}
+                    {p.id === currentUserId && <span className="ml-2 text-xs text-muted-foreground">(you)</span>}
                   </TableCell>
-                  <TableCell className="text-gray-600">{p.username}</TableCell>
+                  <TableCell className="text-muted-foreground">{p.username}</TableCell>
                   <TableCell>
                     <span className={cn(
                       'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                      p.roles?.is_system ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-600',
+                      p.roles?.is_system ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-muted-foreground',
                     )}>
                       {p.roles?.name ?? '—'}
                     </span>
@@ -132,7 +132,7 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
                   <TableCell>
                     <span className={cn(
                       'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                      p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500',
+                      p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-muted-foreground',
                     )}>
                       {p.active ? 'Active' : 'Inactive'}
                     </span>
@@ -280,7 +280,7 @@ function EmployeeDialog({
                 autoFocus
                 autoComplete="off"
               />
-              <p className="text-xs text-gray-400">3–30 letters, numbers, dot, dash or underscore. Used to sign in.</p>
+              <p className="text-xs text-muted-foreground">3–30 letters, numbers, dot, dash or underscore. Used to sign in.</p>
             </div>
           )}
 
@@ -311,7 +311,7 @@ function EmployeeDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-gray-400">Each role grants a set of permissions. Manage roles in Settings → Roles.</p>
+                <p className="text-xs text-muted-foreground">Each role grants a set of permissions. Manage roles in Settings → Roles.</p>
               </div>
             </>
           )}
