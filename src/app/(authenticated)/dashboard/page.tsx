@@ -10,16 +10,19 @@ import { formatCurrency } from '@/lib/utils'
 import { FileText, Users, DollarSign, AlertCircle, Plus } from 'lucide-react'
 import { countsAsRevenue, isOutstanding } from '@/lib/invoice-status'
 import { DashboardRecentInvoices } from '@/components/dashboard/DashboardRecentInvoices'
+import { startOfMonth, addMonths, format } from 'date-fns'
 
 export default async function DashboardPage() {
   const { statsInvoices, customerCount, recentInvoices } = await getDashboardData()
 
   // Month-to-date revenue + total outstanding, computed server-side (mirrors the
-  // original page). `firstOfMonth` is the local first-of-month yyyy-MM-dd.
+  // original page). Uses date-fns to compute the local first-of-month (no UTC shift)
+  // and an explicit upper bound to avoid bleeding into adjacent months.
   const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
+  const nextMonthStart = format(startOfMonth(addMonths(now, 1)), 'yyyy-MM-dd')
   const revenue = statsInvoices
-    .filter(i => countsAsRevenue(i) && i.due_date >= firstOfMonth)
+    .filter(i => countsAsRevenue(i) && i.due_date >= monthStart && i.due_date < nextMonthStart)
     .reduce((s, i) => s + Number(i.total), 0)
   const outstanding = statsInvoices
     .filter(i => isOutstanding(i))
