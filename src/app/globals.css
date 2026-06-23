@@ -36,15 +36,15 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
-  /* Typography — Fraunces (display serif) + Hanken Grotesk (humanist sans) */
+  /* Typography — Chidental uses a single clean sans-serif family throughout. */
   --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), Georgia, 'Times New Roman', serif;
+  --font-display: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
 
-  /* Warm, layered elevation (replaces flat default shadows) */
-  --shadow-xs: 0 1px 2px 0 hsl(28 40% 20% / 0.04);
-  --shadow-sm: 0 1px 2px 0 hsl(28 40% 20% / 0.05), 0 1px 3px 0 hsl(28 40% 20% / 0.04);
-  --shadow-md: 0 2px 4px -1px hsl(28 40% 20% / 0.06), 0 8px 16px -4px hsl(28 40% 20% / 0.08);
-  --shadow-lg: 0 4px 8px -2px hsl(28 40% 20% / 0.08), 0 16px 32px -8px hsl(28 40% 20% / 0.12);
+  /* Neutral elevation for a quieter operational UI. */
+  --shadow-xs: 0 1px 2px 0 hsl(220 16% 16% / 0.04);
+  --shadow-sm: 0 1px 2px 0 hsl(220 16% 16% / 0.05), 0 1px 3px 0 hsl(220 16% 16% / 0.04);
+  --shadow-md: 0 2px 4px -1px hsl(220 16% 16% / 0.06), 0 10px 18px -8px hsl(220 16% 16% / 0.12);
+  --shadow-lg: 0 4px 8px -2px hsl(220 16% 16% / 0.08), 0 18px 36px -12px hsl(220 16% 16% / 0.14);
 
   /* Keyframes */
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -62,27 +62,27 @@
 
 @layer base {
   :root {
-    /* "Warm clinical editorial" — bone canvas, near-white surfaces, brown brand */
-    --background: 36 30% 95%;        /* warm bone / cream canvas */
-    --foreground: 24 28% 14%;        /* near-black espresso */
-    --card: 40 44% 99%;             /* warm near-white surface */
-    --card-foreground: 24 28% 14%;
-    --popover: 40 44% 99%;
-    --popover-foreground: 24 28% 14%;
-    --primary: 22 62% 22%;          /* #5C3117 dark brown */
-    --primary-foreground: 36 40% 97%;
-    --secondary: 34 24% 91%;
-    --secondary-foreground: 24 26% 22%;
-    --muted: 35 22% 92%;
-    --muted-foreground: 26 13% 42%;  /* warm taupe-gray */
-    --accent: 30 30% 89%;
-    --accent-foreground: 24 26% 22%;
+    /* Chidental brand system. Primary is #766254 from the rectangle logo. */
+    --background: 210 20% 98%;
+    --foreground: 220 18% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 18% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 18% 12%;
+    --primary: 25 17% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 18% 95%;
+    --secondary-foreground: 220 18% 18%;
+    --muted: 210 16% 94%;
+    --muted-foreground: 218 8% 43%;
+    --accent: 25 24% 92%;
+    --accent-foreground: 24 18% 24%;
     --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: 32 20% 87%;            /* warm hairline */
-    --input: 32 20% 87%;
-    --ring: 22 55% 30%;
-    --radius: 0.7rem;
+    --border: 214 14% 88%;
+    --input: 214 14% 88%;
+    --ring: 25 17% 40%;
+    --radius: 0.5rem;
   }
 }
 
@@ -96,11 +96,10 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  /* Page titles wear the display serif — the editorial signature of the app. */
   h1 {
-    font-family: var(--font-fraunces), Georgia, serif;
+    font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
     font-optical-sizing: auto;
-    letter-spacing: -0.015em;
+    letter-spacing: 0;
   }
 }
 

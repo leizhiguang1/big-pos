@@ -58,7 +58,7 @@ export default function CommandPalette() {
       onOpenChange={setOpen}
       label="Command palette"
       overlayClassName="fixed inset-0 z-50 bg-black/40"
-      contentClassName="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card shadow-xl"
+      contentClassName="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card shadow-xl"
     >
       <div className="flex items-center gap-2 border-b border-border px-3">
         <Search className="h-4 w-4 shrink-0 text-muted-foreground" />

@@ -30,9 +30,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight tabular-nums text-foreground">Dashboard</h1>
+          <h1 className="text-3xl font-semibold tabular-nums text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Welcome back</p>
         </div>
         <Button asChild>
@@ -47,7 +47,7 @@ export default async function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl font-semibold tracking-tight tabular-nums text-foreground">{formatCurrency(revenue)}</p>
+            <p className="text-3xl font-semibold tabular-nums text-foreground">{formatCurrency(revenue)}</p>
           </CardContent>
         </Card>
 
@@ -57,7 +57,7 @@ export default async function DashboardPage() {
             <AlertCircle className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl font-semibold tracking-tight tabular-nums text-yellow-700">{formatCurrency(outstanding)}</p>
+            <p className="text-3xl font-semibold tabular-nums text-yellow-700">{formatCurrency(outstanding)}</p>
           </CardContent>
         </Card>
 
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl font-semibold tracking-tight tabular-nums text-foreground">{statsInvoices.length}</p>
+            <p className="text-3xl font-semibold tabular-nums text-foreground">{statsInvoices.length}</p>
           </CardContent>
         </Card>
 
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="font-display text-3xl font-semibold tracking-tight tabular-nums text-foreground">{customerCount}</p>
+            <p className="text-3xl font-semibold tabular-nums text-foreground">{customerCount}</p>
           </CardContent>
         </Card>
       </div>

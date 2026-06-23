@@ -13,6 +13,9 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { statusBadgeVariant } from '@/lib/status-badge'
 import type { ReportSummary } from '@/lib/reports'
 
+const BRAND_CHART = '#766254'
+const BRAND_CHART_SOFT = '#9b8779'
+
 // Interactive shell for the reports page. The Server Component fetches + computes
 // `summary`; this island renders it and drives the date range through the URL so
 // a change re-runs the server query. `isPending` shows the in-flight spinner.
@@ -158,7 +161,7 @@ export function ReportsClient({ from, to, summary }: { from: string; to: string;
                     <XAxis type="number" tickFormatter={v => `RM${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
                     <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                    <Bar dataKey="total" fill="#5C3117" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="total" fill={BRAND_CHART} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : <p className="text-center text-muted-foreground py-8">No data for this period</p>}
@@ -177,7 +180,7 @@ export function ReportsClient({ from, to, summary }: { from: string; to: string;
                     <XAxis type="number" tickFormatter={v => `RM${(v/1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={160} />
                     <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                    <Bar dataKey="total" fill="#8B5A2B" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="total" fill={BRAND_CHART_SOFT} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : <p className="text-center text-muted-foreground py-8">No data for this period</p>}

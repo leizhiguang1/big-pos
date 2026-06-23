@@ -241,8 +241,8 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
     <div className="space-y-6">
       {!hideHeader && (
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Work Queue</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-2xl font-bold text-foreground">Work Queue</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {activeCount} active item{activeCount === 1 ? '' : 's'} across all invoices
           </p>
         </div>
@@ -260,13 +260,13 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
               onClick={() => setFilter(c.key)}
               className={cn(
                 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                isSelected ? filled : cn(outlined, 'hover:bg-gray-50'),
+                isSelected ? filled : cn(outlined, 'hover:bg-muted'),
               )}
             >
               {c.label}
               <span className={cn(
                 'inline-flex items-center justify-center min-w-[18px] h-4 rounded-full px-1 text-[10px] font-semibold',
-                isSelected ? 'bg-white/25' : 'bg-gray-100 text-gray-600',
+                isSelected ? 'bg-white/25' : 'bg-muted text-muted-foreground',
               )}>
                 {c.count}
               </span>
@@ -276,7 +276,7 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
       </div>
 
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search item, invoice, clinic…"
           value={search}
@@ -286,7 +286,7 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
       </div>
 
       {grouped.length === 0 && (
-        <Card><CardContent className="py-10 text-center text-gray-400">No items.</CardContent></Card>
+        <Card><CardContent className="py-10 text-center text-muted-foreground">No items.</CardContent></Card>
       )}
 
       <div className="space-y-4">
@@ -297,12 +297,12 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
               <button
                 type="button"
                 onClick={() => toggleCollapsed(group.key)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 border-b"
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted border-b"
               >
                 <div className="flex items-center gap-3">
-                  {isCollapsed ? <ChevronRight className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                  {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                   <SlotBadge value={group.key} stagesById={allStagesById} />
-                  <span className="text-sm text-gray-500">{group.items.length} item{group.items.length === 1 ? '' : 's'}</span>
+                  <span className="text-sm text-muted-foreground">{group.items.length} item{group.items.length === 1 ? '' : 's'}</span>
                 </div>
               </button>
               {!isCollapsed && (
@@ -329,19 +329,19 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
                         </div>
 
                         <div className="md:w-48 min-w-0">
-                          <div className="text-sm text-gray-700 truncate">
+                          <div className="text-sm text-muted-foreground truncate">
                             {row.invoices?.customers?.clinic_name ?? '—'}
                           </div>
                         </div>
 
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm text-gray-900 truncate">{row.description}</div>
+                          <div className="text-sm text-foreground truncate">{row.description}</div>
                           {isMoved ? (
                             <div className="text-xs text-green-700 mt-0.5 flex items-center gap-1">
                               <Check className="h-3 w-3" /> Moved to <SlotBadge value={movedTo!} stagesById={allStagesById} className="ml-0.5" />
                             </div>
                           ) : (
-                            <div className="text-xs text-gray-400 mt-0.5">{relativeTime(row.work_status_updated_at, clientNow)}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{relativeTime(row.work_status_updated_at, clientNow)}</div>
                           )}
                         </div>
 

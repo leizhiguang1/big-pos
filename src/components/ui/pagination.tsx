@@ -28,7 +28,7 @@ export function Pagination({
   className,
 }: PaginationProps) {
   return (
-    <div className={cn('flex items-center justify-between text-sm text-gray-500', className)}>
+    <div className={cn('flex items-center justify-between text-sm text-muted-foreground', className)}>
       <span>
         {filteredCount === 0
           ? `No ${itemLabel}`

@@ -77,8 +77,8 @@ export function ProductSearchAdd({
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          'flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50/40 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900',
-          open && 'border-gray-400 bg-gray-50 text-gray-900',
+          'flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground',
+          open && 'border-primary/40 bg-muted text-foreground',
         )}
       >
         <Plus className="h-4 w-4" />
@@ -86,9 +86,9 @@ export function ProductSearchAdd({
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
-          <div className="flex items-center gap-2 border-b border-gray-100 px-3">
-            <Search className="h-4 w-4 shrink-0 text-gray-400" />
+        <div className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-xl">
+          <div className="flex items-center gap-2 border-b border-border px-3">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               ref={inputRef}
               value={query}
@@ -99,15 +99,15 @@ export function ProductSearchAdd({
               onKeyDown={onKeyDown}
               placeholder="Search products…"
               aria-label="Search products"
-              className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
+              className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
 
           <div className="max-h-72 overflow-auto py-1" role="listbox">
             {products.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-gray-400">No products yet. Add products first.</div>
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">No products yet. Add products first.</div>
             ) : matches.length === 0 ? (
-              <div className="px-3 py-6 text-center text-sm text-gray-400">No products match “{query.trim()}”.</div>
+              <div className="px-3 py-6 text-center text-sm text-muted-foreground">No products match “{query.trim()}”.</div>
             ) : (
               matches.map((p, idx) => {
                 const hasRange = p.min_unit_price != null && p.max_unit_price != null
@@ -121,20 +121,20 @@ export function ProductSearchAdd({
                     onClick={() => pick(p)}
                     className={cn(
                       'flex w-full items-center justify-between gap-3 px-3 py-2 text-left',
-                      idx === highlight ? 'bg-primary/5' : 'hover:bg-gray-50',
+                      idx === highlight ? 'bg-primary/5' : 'hover:bg-muted',
                     )}
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-gray-900">{p.name}</span>
-                      {p.description && <span className="block truncate text-xs text-gray-400">{p.description}</span>}
+                      <span className="block truncate text-sm font-medium text-foreground">{p.name}</span>
+                      {p.description && <span className="block truncate text-xs text-muted-foreground">{p.description}</span>}
                     </span>
                     <span className="shrink-0 text-right text-xs">
-                      <span className="font-medium text-gray-700">
+                      <span className="font-medium text-foreground">
                         {hasRange
                           ? `${formatCurrency(p.min_unit_price!)} – ${formatCurrency(p.max_unit_price!)}`
                           : formatCurrency(p.unit_price)}
                       </span>
-                      <span className="block text-gray-400">/{p.unit}</span>
+                      <span className="block text-muted-foreground">/{p.unit}</span>
                     </span>
                   </button>
                 )
