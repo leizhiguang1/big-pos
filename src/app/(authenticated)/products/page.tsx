@@ -1,5 +1,5 @@
 import { getProductsPage, getActiveUnits, type ProductView } from '@/data/products'
-import { parseListSearchParams } from '@/lib/use-list-url-state'
+import { parseListSearchParams } from '@/lib/list-url-state'
 import { ProductsClient } from '@/components/products/ProductsClient'
 
 export default async function ProductsPage({

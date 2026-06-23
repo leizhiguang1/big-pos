@@ -12,14 +12,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import type { SortState } from '@/lib/data-table'
+import type { ListUrlState } from '@/lib/list-url-state'
 
-export interface ListUrlState {
-  q: string
-  view: string
-  page: number
-  sort: string | null
-  dir: 'asc' | 'desc'
-}
+// Re-exported so existing client consumers can keep importing the type from
+// here. The server-safe parser + type itself live in `./list-url-state`.
+export type { ListUrlState } from '@/lib/list-url-state'
 
 export interface UseListUrlState {
   /** Live search box value (instant local echo; pushed to the URL debounced). */
@@ -135,26 +132,5 @@ export function useListUrlState(
     sort: state.sort ? { key: state.sort, dir: state.dir } : undefined,
     clearSearch,
     clearView,
-  }
-}
-
-/**
- * Parse raw Next.js `searchParams` into a typed {@link ListUrlState}. Unknown /
- * malformed values fall back to safe defaults (page 1, asc, no sort).
- */
-export function parseListSearchParams(
-  sp: Record<string, string | string[] | undefined>,
-  defaultView: string,
-): ListUrlState {
-  const first = (v: string | string[] | undefined): string => (Array.isArray(v) ? (v[0] ?? '') : (v ?? ''))
-  const pageNum = Number.parseInt(first(sp.page), 10)
-  const sort = first(sp.sort) || null
-  const dir = first(sp.dir) === 'desc' ? 'desc' : 'asc'
-  return {
-    q: first(sp.q),
-    view: first(sp.view) || defaultView,
-    page: Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1,
-    sort,
-    dir,
   }
 }

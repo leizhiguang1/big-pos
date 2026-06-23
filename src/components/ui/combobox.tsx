@@ -24,6 +24,8 @@ export interface ComboboxProps {
   searchPlaceholder?: string
   emptyText?: string
   className?: string
+  /** Extra classes for the dropdown panel — e.g. a min-width when the trigger is narrow. */
+  menuClassName?: string
   id?: string
   'aria-label'?: string
   /** Optional compact text for the closed trigger, overriding the selected option's label. */
@@ -38,6 +40,7 @@ export function Combobox({
   searchPlaceholder = 'Search…',
   emptyText = 'No matches.',
   className,
+  menuClassName,
   id,
   'aria-label': ariaLabel,
   triggerLabel,
@@ -116,7 +119,7 @@ export function Combobox({
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1.5 w-full overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-xl">
+        <div className={cn('absolute z-30 mt-1.5 w-full overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-xl', menuClassName)}>
           <div className="flex items-center gap-2 border-b border-border px-3">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input

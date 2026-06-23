@@ -1,5 +1,5 @@
 import { getCustomersPage } from '@/data/customers'
-import { parseListSearchParams } from '@/lib/use-list-url-state'
+import { parseListSearchParams } from '@/lib/list-url-state'
 import { CustomerListClient } from '@/components/customers/CustomerListClient'
 
 export default async function CustomersPage({
