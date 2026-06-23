@@ -238,6 +238,35 @@ export async function updateWorkStatusAction(
   return { ok: true }
 }
 
+// Save the per-item internal work note. Mirrors updateWorkStatusAction: same
+// invoices.view gate (the note lives beside the status dropdown, which renders for
+// any non-void invoice) and the same SSR (session) client so RLS's authenticated_all
+// policy permits the write. The note is internal-only — it is NOT printed on the
+// customer-facing invoice (it'll print on the Wave 3 bench work ticket later).
+export async function updateWorkNoteAction(
+  itemId: string,
+  workNote: string | null,
+): Promise<ActionResult> {
+  const gate = await requirePermission('invoices.view')
+  if (!gate.ok) return gate
+
+  const supabase = await createClient()
+
+  // Normalize empty/whitespace-only input back to NULL so "cleared" reads as unset.
+  const trimmed = workNote?.trim()
+  const value = trimmed ? trimmed : null
+
+  const { data, error } = await supabase
+    .from('invoice_items')
+    .update({ work_note: value })
+    .eq('id', itemId)
+    .select('invoice_id')
+    .single()
+  if (error) return { ok: false, error: error.message }
+  if (data?.invoice_id) revalidateInvoice(data.invoice_id)
+  return { ok: true }
+}
+
 // Advance ALL items of an invoice to a single work status (Kanban drag-to-column).
 // Mirrors updateWorkStatusAction's permission gate, on_hold round-trip logic, and
 // revalidation. The DB trigger handles history logging + work_status_updated_at

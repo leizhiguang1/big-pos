@@ -10,13 +10,14 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/feedback/toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { formatDate, cn } from '@/lib/utils'
 import { ChevronRight } from 'lucide-react'
 import { WorkStatusBadge } from '@/components/work-status-badge'
 import { WorkStatusSelect } from '@/components/work-status-select'
 import { WorkStageStepper } from '@/components/work/WorkStageStepper'
 import { encodeWork, decodeWork, workLabel, workColor } from '@/lib/work-stages'
-import { updateWorkStatusAction } from '@/data/invoice-actions'
+import { updateWorkStatusAction, updateWorkNoteAction } from '@/data/invoice-actions'
 import type { InvoiceItem, InvoiceItemStatusHistory, WorkStage } from '@/lib/database.types'
 
 export type WorkStatusEditorProps = {
@@ -41,6 +42,14 @@ export function WorkStatusEditor({ items, history, stages }: WorkStatusEditorPro
     router.refresh()
   }
 
+  const saveWorkNote = async (itemId: string, note: string) => {
+    const res = await updateWorkNoteAction(itemId, note)
+    if (res.ok === false) { show({ variant: 'error', title: res.error }); return false }
+    show({ variant: 'success', title: 'Work note saved' })
+    router.refresh()
+    return true
+  }
+
   return (
     <Card className="print:hidden">
       <CardHeader>
@@ -57,8 +66,17 @@ export function WorkStatusEditor({ items, history, stages }: WorkStatusEditorPro
           </TableHeader>
           <TableBody>
             {items.map(item => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.description}</TableCell>
+              <TableRow key={item.id} className="align-top">
+                <TableCell className="font-medium">
+                  {item.description}
+                  {/* Internal work note — surfaced + editable here, kept off the
+                      printed customer invoice (prints on the Wave 3 work ticket). */}
+                  <WorkNoteCell
+                    itemId={item.id}
+                    note={item.work_note}
+                    onSave={saveWorkNote}
+                  />
+                </TableCell>
                 <TableCell>
                   <WorkStatusSelect
                     value={encodeWork(item.work_status, item.stage_id)}
@@ -137,5 +155,92 @@ export function WorkStatusEditor({ items, history, stages }: WorkStatusEditorPro
         )}
       </CardContent>
     </Card>
+  )
+}
+
+// Per-item internal work note. Collapsed by default to a one-line preview (or an
+// "Add note" affordance when empty); expands to an editable textarea with
+// Save/Cancel. Saves through updateWorkNoteAction; the parent router.refresh()
+// re-renders with the persisted value.
+function WorkNoteCell({
+  itemId,
+  note,
+  onSave,
+}: {
+  itemId: string
+  note: string | null
+  onSave: (itemId: string, note: string) => Promise<boolean>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(note ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const startEditing = () => {
+    setDraft(note ?? '')
+    setEditing(true)
+  }
+
+  const cancel = () => {
+    setDraft(note ?? '')
+    setEditing(false)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    const ok = await onSave(itemId, draft)
+    setSaving(false)
+    if (ok) setEditing(false)
+  }
+
+  if (!editing) {
+    return note ? (
+      <button
+        type="button"
+        onClick={startEditing}
+        className="mt-1 block text-left text-xs font-normal text-gray-600 hover:text-gray-900"
+        title="Edit work note"
+      >
+        <span className="text-gray-400">Note:</span> {note}
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={startEditing}
+        className="mt-1 block text-left text-xs font-normal text-gray-400 hover:text-gray-600"
+      >
+        + Add note
+      </button>
+    )
+  }
+
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      <Textarea
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        placeholder="Internal work note (not printed on invoice)"
+        rows={2}
+        className="min-h-[56px] text-xs font-normal"
+        autoFocus
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          type="button"
+          onClick={cancel}
+          disabled={saving}
+          className="rounded-md px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   )
 }
