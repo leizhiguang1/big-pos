@@ -25,6 +25,11 @@ export type WorkStatus = Database['public']['Enums']['work_status']
 // (e.g. form state). See `invoice-status.ts` for the state machine.
 export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue'
 
+// `credits.reason` is a plain text column (no DB enum), typed as `string` by the
+// schema. This union is the app's domain vocabulary for a credit's reason —
+// remake / return / goodwill (all non-chargeable adjustments). See `credits.ts`.
+export type CreditReason = 'remake' | 'return' | 'goodwill'
+
 // --- Table row aliases (schema-driven) -------------------------------------
 
 export type Customer = Tables<'customers'>
@@ -35,6 +40,7 @@ export type Unit = Tables<'units'>
 export type Role = Tables<'roles'>
 export type RolePermission = Tables<'role_permissions'>
 export type Payment = Tables<'payments'>
+export type Credit = Tables<'credits'>
 export type InvoiceItem = Tables<'invoice_items'>
 export type InvoiceItemStatusHistory = Tables<'invoice_item_status_history'>
 

@@ -5,22 +5,36 @@
 
 import { notFound } from 'next/navigation'
 import { getCustomerDetail } from '@/data/customers'
+import { getCreditsForCustomer } from '@/data/credits'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { cn, formatCurrency, todayISODate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, todayISODate } from '@/lib/utils'
 import { summarizeCustomerInvoices, arAging } from '@/lib/invoice-status'
-import { Phone, Mail, MapPin, Truck, MessageCircle } from 'lucide-react'
+import { creditReasonLabel } from '@/lib/credit'
+import { whatsAppLink } from '@/lib/phone'
+import { Phone, Mail, MapPin, Truck } from 'lucide-react'
 import { CustomerDetailHeader } from '@/components/customers/CustomerDetailHeader'
 import { CustomerInvoiceHistory } from '@/components/customers/CustomerInvoiceHistory'
+import { IssueCreditDialog } from '@/components/customers/IssueCreditDialog'
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const data = await getCustomerDetail(id)
+  const [data, credits] = await Promise.all([getCustomerDetail(id), getCreditsForCustomer(id)])
   if (!data) notFound()
 
   const { customer, invoices } = data
   const { totalBilled, totalOutstanding } = summarizeCustomerInvoices(invoices)
   const aging = arAging(invoices, todayISODate())
+
+  // A credit is a non-payment reduction of the clinic's account. The account
+  // balance nets credits OUT explicitly; the A/R aging buckets stay payment-based
+  // and unchanged (credits never get allocated into 0–30/31–60/… buckets).
+  const totalCredits = credits.reduce((s, c) => s + Number(c.amount), 0)
+  const accountBalance = totalOutstanding - totalCredits
+
+  // The "against invoice" picker offers the clinic's invoices, newest-first
+  // (getCustomerDetail already returns them in that order).
+  const invoiceOptions = invoices.map((inv) => ({ id: inv.id, invoice_number: inv.invoice_number }))
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -33,14 +47,13 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             {customer.phone && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                <a href={`tel:${customer.phone}`} className="text-primary hover:underline">{customer.phone}</a>
                 <a
-                  href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`}
+                  href={whatsAppLink(customer.phone) ?? undefined}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+                  className="text-primary hover:underline"
                 >
-                  <MessageCircle className="h-3.5 w-3.5" />WhatsApp
+                  {customer.phone}
                 </a>
               </div>
             )}
@@ -87,12 +100,51 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(totalBilled)}</p>
             </CardContent>
           </Card>
+          {/* Account balance = outstanding − account credits. We show the two
+              components as explicit lines so the netting is legible rather than
+              silently folded into one figure. */}
           <Card>
-            <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Outstanding</p>
-              <p className="text-xl font-bold text-yellow-600 mt-1">{formatCurrency(totalOutstanding)}</p>
+            <CardContent className="pt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Outstanding</p>
+                <p className="text-sm font-semibold tabular-nums text-yellow-600">{formatCurrency(totalOutstanding)}</p>
+              </div>
+              {totalCredits > 0 && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">Less: account credits</p>
+                    <p className="text-sm font-semibold tabular-nums text-foreground">−{formatCurrency(totalCredits)}</p>
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-foreground">Account Balance</p>
+                    <p className="text-xl font-bold tabular-nums text-foreground">{formatCurrency(accountBalance)}</p>
+                  </div>
+                </>
+              )}
+              <div className="pt-1">
+                <IssueCreditDialog customerId={id} invoices={invoiceOptions} />
+              </div>
             </CardContent>
           </Card>
+          {credits.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground">Account Credits</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {credits.map((c) => (
+                  <div key={c.id} className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-foreground">Credit — {creditReasonLabel(c.reason)}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(c.credit_date)}</p>
+                    </div>
+                    <span className="font-medium tabular-nums text-foreground">−{formatCurrency(Number(c.amount))}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
           {totalOutstanding > 0 && (
             <Card>
               <CardHeader className="pb-2">
@@ -113,6 +165,17 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                     </span>
                   </div>
                 ))}
+                {/* Credits are NOT bucketed by age — aging stays payment-based.
+                    Show the total as a separate adjustment beneath the table. */}
+                {totalCredits > 0 && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Less: account credits</span>
+                      <span className="font-medium tabular-nums text-foreground">−{formatCurrency(totalCredits)}</span>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}

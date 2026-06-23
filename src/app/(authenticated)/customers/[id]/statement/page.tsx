@@ -11,6 +11,7 @@ import { getClinicStatement } from '@/data/customers'
 import { buildStatement } from '@/lib/statement'
 import { COMPANY } from '@/lib/config'
 import { formatCurrency, formatDate, todayISODate } from '@/lib/utils'
+import { CREDIT_REASON_LABELS } from '@/lib/credit'
 import { StatementPrintButton } from '@/components/StatementPrintButton'
 
 export default async function StatementPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,9 +19,9 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
   const bundle = await getClinicStatement(id)
   if (!bundle) notFound()
 
-  const { clinic, invoices, payments } = bundle
+  const { clinic, invoices, payments, credits } = bundle
   const today = todayISODate()
-  const stmt = buildStatement(invoices, payments, today)
+  const stmt = buildStatement(invoices, payments, credits, today)
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
@@ -45,9 +46,9 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
           <div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo.png"
+              src="/chidental-rectangle.png"
               alt={COMPANY.name}
-              className="max-h-10 max-w-[200px] object-contain object-left mb-2"
+              className="max-h-12 max-w-[220px] object-contain object-left mb-2"
             />
             <div className="text-sm text-muted-foreground whitespace-pre-line">{COMPANY.address}</div>
             {COMPANY.phone && <div className="text-sm text-muted-foreground">Tel: {COMPANY.phone}</div>}
@@ -133,9 +134,24 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
                 </td>
                 <td />
               </tr>
+              {/* Credits are a non-payment reduction of the clinic's account —
+                  shown as an explicit "Less: account credits" line so the math
+                  to the closing balance is legible. */}
+              {stmt.totalCredits > 0 && (
+                <tr>
+                  <td colSpan={3} className="pt-1 text-right text-sm text-muted-foreground">
+                    Less: account credits
+                  </td>
+                  <td />
+                  <td />
+                  <td className="pt-1 text-right tabular-nums font-semibold text-foreground">
+                    −{formatCurrency(stmt.totalCredits)}
+                  </td>
+                </tr>
+              )}
               <tr>
                 <td colSpan={3} className="pt-2 text-right text-sm font-bold text-foreground">
-                  Balance Due
+                  {stmt.totalCredits > 0 ? 'Account Balance' : 'Balance Due'}
                 </td>
                 <td />
                 <td />
@@ -148,6 +164,37 @@ export default async function StatementPage({ params }: { params: Promise<{ id: 
         ) : (
           <div className="py-12 text-center text-muted-foreground text-sm mb-6">
             No outstanding invoices.
+          </div>
+        )}
+
+        {/* ── Account credits ledger ─────────────────────────────────────── */}
+        {stmt.credits.length > 0 && (
+          <div className="mb-8">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Account Credits
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-1.5 text-muted-foreground font-medium">Date</th>
+                  <th className="text-left py-1.5 text-muted-foreground font-medium">Reason</th>
+                  <th className="text-left py-1.5 text-muted-foreground font-medium">Against</th>
+                  <th className="text-right py-1.5 text-muted-foreground font-medium tabular-nums">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stmt.credits.map((c, i) => (
+                  <tr key={i} className="border-b border-border last:border-0">
+                    <td className="py-2 text-foreground">{formatDate(c.date)}</td>
+                    <td className="py-2 text-foreground">
+                      Credit — {CREDIT_REASON_LABELS[c.reason as keyof typeof CREDIT_REASON_LABELS] ?? c.reason}
+                    </td>
+                    <td className="py-2 text-muted-foreground font-mono text-xs">{c.number ?? '—'}</td>
+                    <td className="py-2 text-right tabular-nums text-foreground">−{formatCurrency(c.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 

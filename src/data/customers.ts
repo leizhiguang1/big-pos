@@ -9,7 +9,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { Customer, Invoice } from '@/lib/database.types'
-import type { StatementInvoiceRow, StatementPaymentRow } from '@/lib/statement'
+import type { StatementInvoiceRow, StatementPaymentRow, StatementCreditRow } from '@/lib/statement'
 
 // The bundle the detail page needs: the customer plus its invoice history.
 export type CustomerDetail = {
@@ -113,13 +113,14 @@ export type ClinicStatementBundle = {
   clinic: Customer
   invoices: StatementInvoiceRow[]
   payments: StatementPaymentRow[]
+  credits: StatementCreditRow[]
 }
 
 export async function getClinicStatement(id: string): Promise<ClinicStatementBundle | null> {
   const supabase = await createClient()
 
-  // Fetch clinic + non-voided invoices in parallel
-  const [cRes, iRes] = await Promise.all([
+  // Fetch clinic + non-voided invoices + the clinic's account credits in parallel.
+  const [cRes, iRes, crRes] = await Promise.all([
     supabase.from('customers').select('*').eq('id', id).single(),
     supabase
       .from('invoices')
@@ -127,11 +128,17 @@ export async function getClinicStatement(id: string): Promise<ClinicStatementBun
       .eq('customer_id', id)
       .is('voided_at', null)
       .order('invoice_date', { ascending: true }),
+    supabase
+      .from('credits')
+      .select('credit_date, amount, reason, invoice_id')
+      .eq('customer_id', id)
+      .order('credit_date', { ascending: true }),
   ])
 
   if (!cRes.data) return null
 
   const invoices = (iRes.data ?? []) as StatementInvoiceRow[]
+  const credits = (crRes.data ?? []) as StatementCreditRow[]
 
   // Fetch payments for these invoices (empty result set if no invoices)
   let payments: StatementPaymentRow[] = []
@@ -148,6 +155,7 @@ export async function getClinicStatement(id: string): Promise<ClinicStatementBun
     clinic: cRes.data as Customer,
     invoices,
     payments,
+    credits,
   }
 }
 

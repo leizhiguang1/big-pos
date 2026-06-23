@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      credits: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          credit_date: string
+          customer_id: string
+          id: string
+          invoice_id: string | null
+          notes: string | null
+          reason: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          credit_date?: string
+          customer_id: string
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          reason: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          credit_date?: string
+          customer_id?: string
+          id?: string
+          invoice_id?: string | null
+          notes?: string | null
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credits_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credits_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           billing_address: string | null
