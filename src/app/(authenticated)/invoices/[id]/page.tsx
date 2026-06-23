@@ -54,6 +54,19 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         unrecorded={unrecorded}
       />
 
+      {/* Internal remarks — staff-only, never printed. Stored in invoices.notes. */}
+      {invoice.notes?.trim() && (
+        <Card className="print:hidden">
+          <CardHeader>
+            <CardTitle className="text-base">Remarks</CardTitle>
+            <p className="text-xs text-gray-500">Internal only — not shown to the customer.</p>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-700 whitespace-pre-line">{invoice.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Case details — editable island, hidden on print */}
       {!voided && <CaseDetailsEditor invoice={invoice} />}
 

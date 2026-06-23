@@ -11,9 +11,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { formatCurrency, cn } from '@/lib/utils'
-import { ArrowLeft, ChevronDown, ChevronRight, Minus, Plus, RotateCcw, StickyNote, Tag, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, RotateCcw, Trash2 } from 'lucide-react'
 import type { InvoiceStatus, Product } from '@/lib/database.types'
 import { addDays, format } from 'date-fns'
 import { DEFAULT_COLOR } from '@/lib/service-status'
@@ -29,7 +28,6 @@ interface LineItem {
   description: string          // prints on the invoice; defaults to the product name
   quantity: number
   unit_price: number
-  work_note: string            // internal lab remark (invoice_items.work_note); not shown to customer
 }
 
 // A customer's delivery address is "different" only when it is present AND not
@@ -38,6 +36,10 @@ function deliveryDiffersFromBilling(delivery: string | null | undefined, billing
   const d = (delivery ?? '').trim()
   return d !== '' && d !== (billing ?? '').trim()
 }
+
+// Hide the native number-input spin buttons (qty / unit price are typed, not stepped).
+const noSpin =
+  '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
 
 export default function InvoiceForm({
   invoiceId,
@@ -63,7 +65,9 @@ export default function InvoiceForm({
   const [dueDate, setDueDate] = useState(
     editInvoice ? (editInvoice.due_date ?? '') : format(addDays(new Date(), 30), 'yyyy-MM-dd'),
   )
-  const [notes, setNotes] = useState(editInvoice?.notes ?? '')
+  // Single invoice-level remark. Internal only — never printed or shown to the
+  // customer. Persisted to invoices.notes (the column kept its name).
+  const [remarks, setRemarks] = useState(editInvoice?.notes ?? '')
   const [patient, setPatient] = useState(editInvoice?.patient ?? '')
   const [doctor, setDoctor] = useState(editInvoice?.doctor ?? '')
   const [serviceStatusId, setServiceStatusId] = useState<string | null>(editInvoice?.service_status_id ?? null)
@@ -74,7 +78,6 @@ export default function InvoiceForm({
       description: r.description,
       quantity: Number(r.quantity),
       unit_price: Number(r.unit_price),
-      work_note: r.work_note ?? '',
     })),
   )
   const [billToName, setBillToName] = useState(editInvoice?.bill_to_name ?? '')
@@ -189,7 +192,7 @@ export default function InvoiceForm({
   const addProduct = useCallback((p: Product) => {
     setItems(prev => [
       ...prev,
-      { id: null, product_id: p.id, description: p.name, quantity: 1, unit_price: p.unit_price, work_note: '' },
+      { id: null, product_id: p.id, description: p.name, quantity: 1, unit_price: p.unit_price },
     ])
   }, [])
 
@@ -212,7 +215,7 @@ export default function InvoiceForm({
     customer_id: customerId,
     invoice_date: invoiceDate,
     due_date: dueDate,
-    notes: notes || null,
+    notes: remarks.trim() || null,
     patient: patient || null,
     doctor: doctor || null,
     service_status_id: serviceStatusId,
@@ -252,7 +255,6 @@ export default function InvoiceForm({
         quantity: i.quantity,
         unit_price: i.unit_price,
         amount: i.quantity * i.unit_price,
-        work_note: i.work_note.trim() || null,
       }))
 
     // Single transactional action: invoice header + all items succeed or fail
@@ -288,7 +290,6 @@ export default function InvoiceForm({
         quantity: i.quantity,
         unit_price: i.unit_price,
         amount: i.quantity * i.unit_price,
-        work_note: i.work_note.trim() || null,
       }))
 
     const result = await updateInvoiceAction(invoiceId, {
@@ -485,99 +486,82 @@ export default function InvoiceForm({
           <CardTitle className="text-base">Line Items</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <ProductSearchAdd products={products} onAdd={addProduct} />
-
           {items.length === 0 ? (
-            <div className="rounded-md border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
-              Search your products above to start adding lines.
+            <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center">
+              <p className="text-sm font-medium text-gray-500">No items yet</p>
+              <p className="mx-auto mt-0.5 max-w-xs text-xs text-gray-400">
+                Add products from your catalogue to build this invoice.
+              </p>
+              <div className="mx-auto mt-4 max-w-xs">
+                <ProductSearchAdd products={products} onAdd={addProduct} />
+              </div>
             </div>
           ) : (
-            <div className="space-y-2">
-              {items.map((item, i) => {
-                const product = item.product_id ? products.find(p => p.id === item.product_id) : null
-                const hasRange = product?.min_unit_price != null && product?.max_unit_price != null
-                // A catalog product with no min/max range is a fixed-price item: price is locked.
-                const isFixed = product != null && !hasRange
-                const priceError = itemPriceErrors[i]
-                const lineTotal = item.quantity * item.unit_price
-                return (
-                  <div key={item.id ?? `new-${i}`} className="space-y-2.5 rounded-lg border border-gray-200 bg-white p-3">
-                    {/* Description (prints on the invoice) — inline-editable, defaults to the product name. */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <input
-                          className="w-full rounded bg-transparent px-1 py-0.5 text-sm font-medium text-gray-900 outline-none placeholder:font-normal placeholder:text-gray-400 hover:bg-gray-50 focus:bg-gray-50 focus:ring-1 focus:ring-gray-200"
-                          value={item.description}
-                          placeholder="Item description"
-                          onChange={e => updateItem(i, 'description', e.target.value)}
-                          aria-label="Line description"
-                        />
-                        {product && (
-                          <span className="ml-1 mt-1 inline-flex items-center gap-1 text-xs text-gray-400">
-                            <Tag className="h-3 w-3" />
-                            {product.name}
-                          </span>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 text-gray-300 hover:text-red-500"
-                        onClick={() => removeItem(i)}
-                        aria-label="Remove line"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+            <>
+              {/* Column header */}
+              <div className="flex items-center gap-3 px-3 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                <span className="flex-1">Item</span>
+                <span className="w-12 text-center">Qty</span>
+                <span className="w-7" />
+                <span className="w-24 text-right">Unit price</span>
+                <span className="w-7" />
+                <span className="w-20 text-right">Amount</span>
+                <span className="w-8" />
+              </div>
 
-                    {/* Qty · unit price · line total */}
-                    <div className="flex flex-wrap items-end gap-x-5 gap-y-2 pl-1">
-                      <div className="space-y-1">
-                        <span className="block text-xs text-gray-400">Qty</span>
-                        <div className="flex items-center">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 rounded-r-none"
-                            onClick={() => updateItem(i, 'quantity', Math.max(1, item.quantity - 1))}
-                            aria-label="Decrease quantity"
-                          >
-                            <Minus className="h-3.5 w-3.5" />
-                          </Button>
-                          <Input
-                            className="h-9 w-12 rounded-none border-x-0 text-center"
-                            type="number"
-                            min="1"
-                            step="1"
-                            value={item.quantity}
-                            onChange={e => updateItem(i, 'quantity', Math.max(1, Math.floor(parseFloat(e.target.value) || 1)))}
-                            aria-label="Quantity"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 rounded-l-none"
-                            onClick={() => updateItem(i, 'quantity', item.quantity + 1)}
-                            aria-label="Increase quantity"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
+              <div className="space-y-1.5">
+                {items.map((item, i) => {
+                  const product = item.product_id ? products.find(p => p.id === item.product_id) : null
+                  const hasRange = product?.min_unit_price != null && product?.max_unit_price != null
+                  // A catalog product with no min/max range is a fixed-price item: price is locked.
+                  const isFixed = product != null && !hasRange
+                  const priceError = itemPriceErrors[i]
+                  const lineTotal = item.quantity * item.unit_price
+                  return (
+                    <div
+                      key={item.id ?? `new-${i}`}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 transition-colors hover:border-gray-300"
+                    >
+                      {/* Money row — the catalogue product is the anchor */}
+                      <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          {product ? (
+                            <div className="flex items-baseline gap-2">
+                              <span className="truncate text-sm font-semibold text-gray-900">{product.name}</span>
+                              <span className="shrink-0 text-xs text-gray-400">/{product.unit}</span>
+                            </div>
+                          ) : (
+                            <Input
+                              className="h-9"
+                              value={item.description}
+                              placeholder="Custom item"
+                              onChange={e => updateItem(i, 'description', e.target.value)}
+                              aria-label="Item description"
+                            />
+                          )}
                         </div>
-                      </div>
 
-                      <div className="space-y-1">
-                        <span className="block text-xs text-gray-400">Unit price (MYR)</span>
+                        <Input
+                          className={cn('h-9 w-12 px-1 text-center', noSpin)}
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          step="1"
+                          value={item.quantity}
+                          onChange={e => updateItem(i, 'quantity', Math.max(1, Math.floor(parseFloat(e.target.value) || 1)))}
+                          aria-label="Quantity"
+                        />
+                        <span className="w-7 shrink-0 text-center text-xs text-gray-300">×</span>
+
                         {isFixed ? (
-                          <div className="flex h-9 items-center text-sm text-gray-600">
+                          <div className="flex h-9 w-24 items-center justify-end text-sm text-gray-500">
                             {formatCurrency(item.unit_price)}
-                            <span className="ml-1.5 text-xs text-gray-400">fixed</span>
                           </div>
                         ) : (
                           <Input
-                            className={cn('h-9 w-28 text-right', priceError && 'border-destructive focus-visible:ring-destructive')}
+                            className={cn('h-9 w-24 text-right', noSpin, priceError && 'border-destructive focus-visible:ring-destructive')}
                             type="number"
+                            inputMode="decimal"
                             min={hasRange ? product!.min_unit_price! : 0}
                             max={hasRange ? product!.max_unit_price! : undefined}
                             step="0.01"
@@ -587,51 +571,56 @@ export default function InvoiceForm({
                             aria-label="Unit price"
                           />
                         )}
-                      </div>
+                        <span className="w-7 shrink-0 text-center text-xs text-gray-300">=</span>
 
-                      <div className="ml-auto space-y-1 text-right">
-                        <span className="block text-xs text-gray-400">Line total</span>
-                        <div className="flex h-9 items-center justify-end text-sm font-semibold text-gray-900">
+                        <span className="w-20 shrink-0 text-right text-sm font-semibold text-gray-900">
                           {formatCurrency(lineTotal)}
-                        </div>
+                        </span>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-gray-300 hover:text-red-500"
+                          onClick={() => removeItem(i)}
+                          aria-label="Remove line"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
+
+                      {/* Secondary, de-emphasised: editable printed description for catalogue products */}
+                      {product && (
+                        <div className="mt-1.5 pr-9">
+                          <input
+                            className="w-full min-w-0 bg-transparent text-xs text-gray-500 outline-none placeholder:text-gray-300"
+                            value={item.description}
+                            placeholder="Printed description"
+                            onChange={e => updateItem(i, 'description', e.target.value)}
+                            aria-label="Printed description"
+                          />
+                        </div>
+                      )}
+
+                      {/* Price guidance / validation — only when it matters */}
+                      {priceError ? (
+                        <p className="mt-1 text-xs text-destructive">{priceError}</p>
+                      ) : hasRange ? (
+                        <p className="mt-1 text-xs text-gray-400">
+                          Allowed {formatCurrency(product!.min_unit_price!)} – {formatCurrency(product!.max_unit_price!)}
+                        </p>
+                      ) : null}
                     </div>
+                  )
+                })}
+              </div>
 
-                    {/* Price guidance / validation */}
-                    {priceError ? (
-                      <p className="pl-1 text-xs text-destructive">{priceError}</p>
-                    ) : hasRange ? (
-                      <p className="pl-1 text-xs text-gray-400">
-                        Allowed {formatCurrency(product!.min_unit_price!)} – {formatCurrency(product!.max_unit_price!)}
-                      </p>
-                    ) : null}
+              <ProductSearchAdd products={products} onAdd={addProduct} />
 
-                    {/* Internal remark (lab note) — captured to work_note, not shown to the customer. */}
-                    <div className="flex items-center gap-1.5 border-t border-gray-100 pt-2">
-                      <StickyNote className="h-3.5 w-3.5 shrink-0 text-gray-300" />
-                      <input
-                        className="w-full bg-transparent text-xs text-gray-600 outline-none placeholder:text-gray-300"
-                        value={item.work_note}
-                        placeholder="Internal remark for the lab (optional — not shown to customer)"
-                        onChange={e => updateItem(i, 'work_note', e.target.value)}
-                        aria-label="Internal remark"
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {items.length > 0 && (
-            <>
-              <Separator />
-              <div className="flex justify-end">
-                <div className="w-48 space-y-1">
-                  <div className="flex justify-between text-sm font-semibold">
-                    <span>Total</span>
-                    <span>{formatCurrency(subtotal)}</span>
-                  </div>
+              <div className="flex justify-end border-t border-gray-200 pt-3">
+                <div className="flex w-56 items-baseline justify-between">
+                  <span className="text-sm text-gray-500">Total</span>
+                  <span className="text-lg font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
                 </div>
               </div>
             </>
@@ -640,12 +629,15 @@ export default function InvoiceForm({
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Remarks</CardTitle>
+          <p className="text-xs text-gray-500">Internal only — not printed or shown to the customer.</p>
+        </CardHeader>
         <CardContent>
           <Textarea
-            placeholder="Any notes or remarks for this invoice…"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
+            placeholder="Internal remarks for this invoice…"
+            value={remarks}
+            onChange={e => setRemarks(e.target.value)}
             rows={3}
           />
         </CardContent>

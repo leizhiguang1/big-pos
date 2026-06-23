@@ -47,7 +47,6 @@ type PrintOverrides = {
   patient: string
   doctor: string
   serviceStatusId: string | null
-  notes: string
   instructions: string
   itemOverrides: Record<string, ItemOverride>
 }
@@ -114,7 +113,6 @@ export function InvoiceDocument({
       patient: invoice.patient ?? '',
       doctor: invoice.doctor ?? '',
       serviceStatusId: invoice.service_status_id,
-      notes: invoice.notes ?? '',
       instructions: '',
       itemOverrides: Object.fromEntries(items.map(it => [it.id, {
         description: it.description,
@@ -209,7 +207,6 @@ export function InvoiceDocument({
         deliveryAddress: o ? o.deliveryAddress : invoice.delivery_address,
         patient:         o ? o.patient         : invoice.patient,
         doctor:          o ? o.doctor          : invoice.doctor,
-        notes:           o ? o.notes           : invoice.notes,
       },
       serviceStatusForPrint: o
         ? (serviceStatuses.find(s => s.id === o.serviceStatusId) ?? null)
@@ -384,12 +381,6 @@ export function InvoiceDocument({
             </tfoot>
           )}
         </table>
-
-        {field.notes && (
-          <div className="mb-6 p-3 bg-gray-50 rounded text-sm text-gray-600">
-            <span className="font-medium text-gray-700">Notes: </span>{field.notes}
-          </div>
-        )}
 
         {!isDelivery && (
           <>
@@ -620,11 +611,6 @@ export function InvoiceDocument({
                       )}
                     </fieldset>
                   )}
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-500">Notes</Label>
-                    <Textarea rows={2} value={printDraft.notes} onChange={e => setPrintDraft(d => d && ({ ...d, notes: e.target.value }))} />
-                  </div>
 
                   {dialogMode === 'delivery' && (
                     <div className="space-y-1.5">
