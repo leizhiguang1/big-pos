@@ -1,3 +1,4 @@
+import { differenceInCalendarDays } from 'date-fns'
 import type { Invoice } from '@/lib/database.types'
 
 type VoidFields = Pick<Invoice, 'voided_at'>
@@ -53,3 +54,40 @@ export const summarizeCustomerInvoices = (
   totalBilled: invoices.filter((i) => !isVoided(i)).reduce((s, i) => s + Number(i.total), 0),
   totalOutstanding: invoices.filter((i) => isOutstanding(i)).reduce((s, i) => s + Number(i.total), 0),
 })
+
+type AgingFields = Pick<Invoice, 'voided_at' | 'status' | 'total' | 'due_date'>
+
+export interface ArAging {
+  current: number // not yet past due
+  d1_30: number
+  d31_60: number
+  d61_90: number
+  d90plus: number
+  total: number
+}
+
+/**
+ * A/R aging of a clinic's OUTSTANDING invoices, bucketed by days past the due
+ * date. Mirrors `summarizeCustomerInvoices`: it uses the full invoice total
+ * (not net of partial payments) so the buckets sum to `totalOutstanding`.
+ * `today` is a local `yyyy-MM-dd` string (see `todayISODate`).
+ */
+export const arAging = (invoices: AgingFields[], today: string): ArAging => {
+  const out: ArAging = { current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90plus: 0, total: 0 }
+  for (const inv of invoices) {
+    if (!isOutstanding(inv)) continue
+    const amt = Number(inv.total)
+    out.total += amt
+    if (inv.due_date == null || inv.due_date === '') {
+      out.current += amt
+      continue
+    }
+    const days = differenceInCalendarDays(new Date(today), new Date(inv.due_date))
+    if (days <= 0) out.current += amt
+    else if (days <= 30) out.d1_30 += amt
+    else if (days <= 60) out.d31_60 += amt
+    else if (days <= 90) out.d61_90 += amt
+    else out.d90plus += amt
+  }
+  return out
+}

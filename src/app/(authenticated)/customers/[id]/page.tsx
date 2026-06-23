@@ -7,8 +7,8 @@ import { notFound } from 'next/navigation'
 import { getCustomerDetail } from '@/data/customers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { formatCurrency } from '@/lib/utils'
-import { summarizeCustomerInvoices } from '@/lib/invoice-status'
+import { cn, formatCurrency, todayISODate } from '@/lib/utils'
+import { summarizeCustomerInvoices, arAging } from '@/lib/invoice-status'
 import { Phone, Mail, MapPin, Truck, MessageCircle } from 'lucide-react'
 import { CustomerDetailHeader } from '@/components/customers/CustomerDetailHeader'
 import { CustomerInvoiceHistory } from '@/components/customers/CustomerInvoiceHistory'
@@ -20,6 +20,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   const { customer, invoices } = data
   const { totalBilled, totalOutstanding } = summarizeCustomerInvoices(invoices)
+  const aging = arAging(invoices, todayISODate())
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -92,6 +93,29 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               <p className="text-xl font-bold text-yellow-600 mt-1">{formatCurrency(totalOutstanding)}</p>
             </CardContent>
           </Card>
+          {totalOutstanding > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground">A/R Aging</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5 text-sm">
+                {[
+                  { label: 'Current', value: aging.current },
+                  { label: '1–30 days', value: aging.d1_30 },
+                  { label: '31–60 days', value: aging.d31_60 },
+                  { label: '61–90 days', value: aging.d61_90 },
+                  { label: '90+ days', value: aging.d90plus, danger: true },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{row.label}</span>
+                    <span className={cn('font-medium tabular-nums', row.danger && row.value > 0 && 'text-red-600')}>
+                      {formatCurrency(row.value)}
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

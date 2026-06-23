@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Invoice } from './database.types'
-import { isVoided, countsAsRevenue, isOutstanding, isOverdue, nextStatusAfterPayment, summarizeCustomerInvoices } from './invoice-status'
+import { isVoided, countsAsRevenue, isOutstanding, isOverdue, nextStatusAfterPayment, summarizeCustomerInvoices, arAging } from './invoice-status'
 
 const inv = (status: string, voided_at: string | null = null): Pick<Invoice, 'status' | 'voided_at'> =>
   ({ status, voided_at })
@@ -102,5 +102,41 @@ describe('summarizeCustomerInvoices', () => {
   })
   it('returns zeros for no invoices', () => {
     expect(summarizeCustomerInvoices([])).toEqual({ totalBilled: 0, totalOutstanding: 0 })
+  })
+})
+
+describe('arAging', () => {
+  const agingInv = (total: number, due_date: string, status = 'sent', voided_at: string | null = null) =>
+    ({ status, voided_at, total, due_date } as Pick<Invoice, 'status' | 'voided_at' | 'total' | 'due_date'>)
+
+  it('buckets outstanding invoices by days past the due date', () => {
+    const today = '2026-06-23'
+    const a = arAging(
+      [
+        agingInv(100, '2026-06-30'), // not yet due -> current
+        agingInv(200, '2026-06-10'), // 13 days -> 1-30
+        agingInv(300, '2026-05-10'), // 44 days -> 31-60
+        agingInv(350, '2026-04-10'), // 74 days -> 61-90
+        agingInv(400, '2026-03-01'), // >90 -> 90+
+      ],
+      today,
+    )
+    expect(a.current).toBe(100)
+    expect(a.d1_30).toBe(200)
+    expect(a.d31_60).toBe(300)
+    expect(a.d61_90).toBe(350)
+    expect(a.d90plus).toBe(400)
+    expect(a.total).toBe(1350)
+  })
+
+  it('excludes paid and voided invoices', () => {
+    const a = arAging(
+      [
+        agingInv(500, '2026-01-01', 'paid'),
+        agingInv(600, '2026-01-01', 'sent', '2026-02-01'),
+      ],
+      '2026-06-23',
+    )
+    expect(a.total).toBe(0)
   })
 })
