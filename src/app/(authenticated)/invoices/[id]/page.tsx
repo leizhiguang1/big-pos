@@ -66,7 +66,6 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         currentServiceStatus={currentServiceStatus}
         customerName={customer?.clinic_name ?? null}
         totalPaid={totalPaid}
-        outstanding={outstanding}
         unrecorded={unrecorded}
       >
         {/* Unified case-status strip — payment · work · service + money, at a glance */}

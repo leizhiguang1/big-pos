@@ -1,16 +1,17 @@
 'use client'
 
 // Header (number + status/overdue/voided/locked badges) and the workflow action
-// bar: Mark Sent, Record Payment (dialog), Mark Paid, Edit link, Print Invoice /
-// Delivery, Void (dialog) and Restore. Each mutation calls a Server Action and
-// reports through the toast; success triggers `router.refresh()` so the server
-// re-renders with fresh data. Payments use the atomic RPCs (record_payment /
-// mark_invoice_paid) — we never recompute status client-side.
+// bar: Mark Sent, Record Payment (dialog), Edit link, Print Invoice / Delivery,
+// Void (dialog) and Restore. Each mutation calls a Server Action and reports
+// through the toast; success triggers `router.refresh()` so the server re-renders
+// with fresh data. Payment goes through the atomic `record_payment` RPC, which
+// records the full outstanding balance and advances status — we never recompute
+// status client-side.
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useForm, useWatch, type Resolver } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '@/contexts/AuthContext'
@@ -22,20 +23,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { formatCurrency, todayISODate } from '@/lib/utils'
-import { ArrowLeft, Printer, CreditCard, CheckCircle, Ban, Pencil, Lock } from 'lucide-react'
+import { ArrowLeft, Printer, CreditCard, Ban, Pencil, Lock } from 'lucide-react'
 import { canEditInvoice } from '@/lib/invoice-permissions'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
 import { statusBadgeVariant } from '@/lib/status-badge'
 import {
   markSentAction,
-  markInvoicePaidAction,
   recordPaymentAction,
 } from '@/data/invoice-actions'
 import { voidInvoice as voidInvoiceAction, restoreInvoice } from '@/lib/invoices/void-actions'
 import type { InvoiceDetail } from '@/data/invoices'
 
 const paymentSchema = z.object({
-  amount: z.coerce.number().min(0.01, 'Amount must be greater than 0'),
   payment_date: z.string().min(1),
   reference_number: z.string().optional(),
   notes: z.string().optional(),
@@ -47,35 +46,29 @@ type PrintMode = 'invoice' | 'delivery'
 export type ActionsBarProps = {
   invoice: InvoiceDetail
   customerName: string | null
-  /** status === 'paid' ? 0 : total - totalPaid */
-  outstanding: number
-  /** max(0, total - totalPaid) — pre-fills the Record Payment amount. */
+  /** max(0, total - totalPaid) — the full balance recorded by Record Payment. */
   unrecorded: number
   /** Opens the print dialog owned by the document island. */
   onPrint: (mode: PrintMode) => void
 }
 
-export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onPrint }: ActionsBarProps) {
+export function ActionsBar({ invoice, customerName, unrecorded, onPrint }: ActionsBarProps) {
   const router = useRouter()
   const { hasPermission } = useAuth()
   const { show } = useToast()
 
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [savingPayment, setSavingPayment] = useState(false)
-  const [markingPaid, setMarkingPaid] = useState(false)
   const [voidOpen, setVoidOpen] = useState(false)
   const [voiding, setVoiding] = useState(false)
   const [voidReason, setVoidReason] = useState('')
   const [restoring, setRestoring] = useState(false)
 
-  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<PaymentForm>({
-    // zod's `coerce.number()` types the resolver input as `unknown`; cast to the
-    // form's value type so RHF's Resolver generics line up.
+  const { register, handleSubmit, reset } = useForm<PaymentForm>({
+    // Cast keeps RHF's Resolver generics aligned with the zod schema's inferred type.
     resolver: zodResolver(paymentSchema) as Resolver<PaymentForm>,
     defaultValues: { payment_date: todayISODate() },
   })
-  const watchedAmount = useWatch({ control, name: 'amount' })
-  const overAmount = outstanding > 0 && Number(watchedAmount) > outstanding
 
   const voided = isVoided(invoice)
   const canEdit = canEditInvoice(invoice, hasPermission)
@@ -85,9 +78,10 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
   const onRecordPayment = async (data: PaymentForm) => {
     setSavingPayment(true)
     // The atomic RPC inserts the payment row AND advances status in one call;
-    // we just refresh afterward — no client-side status recompute.
+    // amount is always the full outstanding balance. We refresh afterward —
+    // no client-side status recompute.
     const res = await recordPaymentAction(invoice.id, {
-      amount: data.amount,
+      amount: unrecorded,
       payment_date: data.payment_date,
       reference: data.reference_number || undefined,
       notes: data.notes || undefined,
@@ -104,16 +98,6 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
     const res = await markSentAction(invoice.id)
     if (res.ok === false) { show({ variant: 'error', title: res.error }); return }
     show({ variant: 'success', title: 'Invoice marked as sent' })
-    router.refresh()
-  }
-
-  const markAsPaid = async () => {
-    setMarkingPaid(true)
-    // mark_invoice_paid writes a balancing payment so sum(payments) === total.
-    const res = await markInvoicePaidAction(invoice.id)
-    setMarkingPaid(false)
-    if (res.ok === false) { show({ variant: 'error', title: res.error }); return }
-    show({ variant: 'success', title: 'Invoice marked as paid' })
     router.refresh()
   }
 
@@ -180,17 +164,12 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
         {!voided && invoice.status === 'draft' && (
           <Button variant="outline" size="sm" onClick={markAsSent}>Mark as Sent</Button>
         )}
-        {/* Record Payment stays available once an invoice is sent — including
-            after it's paid — so you can always log the actual bank reference. */}
-        {!voided && ['sent', 'partial', 'overdue', 'paid'].includes(invoice.status) && (
-          <Button variant="outline" size="sm" onClick={() => { reset({ payment_date: todayISODate(), amount: unrecorded > 0 ? unrecorded : undefined }); setPaymentOpen(true) }}>
-            <CreditCard className="h-4 w-4 mr-2" />Record Payment
-          </Button>
-        )}
-        {/* Mark Paid is a shortcut to settle — only meaningful while still unpaid. */}
+        {/* Record Payment is the single settle action: it records the full
+            outstanding balance and marks the invoice paid. Hidden once paid so
+            a second full payment can't be recorded. */}
         {!voided && ['sent', 'partial', 'overdue'].includes(invoice.status) && (
-          <Button variant="outline" size="sm" onClick={markAsPaid} disabled={markingPaid}>
-            <CheckCircle className="h-4 w-4 mr-2" />Mark Paid
+          <Button variant="outline" size="sm" onClick={() => { reset({ payment_date: todayISODate() }); setPaymentOpen(true) }}>
+            <CreditCard className="h-4 w-4 mr-2" />Record Payment
           </Button>
         )}
         {canEdit && (
@@ -257,15 +236,10 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
         <DialogContent>
           <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onRecordPayment)} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Amount (MYR) *</Label>
-              <Input type="number" min="0.01" step="0.01" {...register('amount')} />
-              {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
-              {!errors.amount && overAmount && (
-                <p className="text-xs text-destructive">
-                  Exceeds the outstanding balance of {formatCurrency(outstanding)}.
-                </p>
-              )}
+            <div className="space-y-1">
+              <Label>Amount (MYR)</Label>
+              <p className="text-lg font-semibold tabular-nums">{formatCurrency(unrecorded)}</p>
+              <p className="text-xs text-muted-foreground">Full outstanding balance — recorded as a single payment.</p>
             </div>
             <div className="space-y-2">
               <Label>Payment Date *</Label>
@@ -281,7 +255,7 @@ export function ActionsBar({ invoice, customerName, outstanding, unrecorded, onP
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setPaymentOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={savingPayment || overAmount}>{savingPayment ? 'Saving…' : 'Record Payment'}</Button>
+              <Button type="submit" disabled={savingPayment || unrecorded <= 0}>{savingPayment ? 'Saving…' : 'Record Payment'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

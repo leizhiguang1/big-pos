@@ -25,7 +25,6 @@ export type InvoiceDetailClientProps = {
   currentServiceStatus: ServiceStatus | null
   customerName: string | null
   totalPaid: number
-  outstanding: number
   unrecorded: number
   /** Editors + status strip, rendered between the actions bar and the printable document. */
   children?: ReactNode
@@ -39,7 +38,6 @@ export function InvoiceDetailClient({
   currentServiceStatus,
   customerName,
   totalPaid,
-  outstanding,
   unrecorded,
   children,
 }: InvoiceDetailClientProps) {
@@ -53,7 +51,6 @@ export function InvoiceDetailClient({
       <ActionsBar
         invoice={invoice}
         customerName={customerName}
-        outstanding={outstanding}
         unrecorded={unrecorded}
         onPrint={mode => printOpenRef.current(mode)}
       />
