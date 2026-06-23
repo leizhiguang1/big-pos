@@ -62,7 +62,7 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
       setSaving(false)
       return
     }
-    show({ variant: 'success', title: isEdit ? 'Customer updated' : 'Customer created' })
+    show({ variant: 'success', title: isEdit ? 'Clinic updated' : 'Clinic created' })
     router.push('/customers')
   }
 
@@ -73,13 +73,13 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{isEdit ? 'Edit Customer' : 'New Customer'}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{isEdit ? 'Edit Clinic' : 'New Clinic'}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Dental clinic or dentist details</p>
         </div>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Customer Information</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Clinic Information</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -139,7 +139,7 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
 
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={saving || !canEdit}>
-                {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Customer'}
+                {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Clinic'}
               </Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
             </div>

@@ -233,7 +233,7 @@ export default function InvoiceForm({
   })
 
   const validate = () => {
-    if (!customerId) { setError('Please select a customer.'); return false }
+    if (!customerId) { setError('Please select a clinic.'); return false }
     if (!patient.trim()) { setError('Patient name is required.'); return false }
     if (!doctor.trim()) { setError('Doctor name is required.'); return false }
     if (!invoiceDate || !dueDate) { setError('Invoice date and due date are required.'); return false }
@@ -323,7 +323,7 @@ export default function InvoiceForm({
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{isEdit ? 'Edit Invoice' : 'New Invoice'}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{isEdit ? 'Update invoice details and items' : 'Create and send to customer'}</p>
+          <p className="text-sm text-gray-500 mt-0.5">{isEdit ? 'Update invoice details and items' : 'Create and send to clinic'}</p>
         </div>
       </div>
 
@@ -337,10 +337,10 @@ export default function InvoiceForm({
         <CardHeader><CardTitle className="text-base">Invoice Details</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Customer *</Label>
+            <Label>Clinic *</Label>
             <Select value={customerId} onValueChange={setCustomerId}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a customer…" />
+                <SelectValue placeholder="Select a clinic…" />
               </SelectTrigger>
               <SelectContent>
                 {customers.map(c => (
@@ -427,7 +427,7 @@ export default function InvoiceForm({
                     {recipientDirty && (
                       <Button type="button" variant="ghost" size="sm" onClick={restoreFromCustomer} className="h-7 text-xs">
                         <RotateCcw className="h-3 w-3 mr-1" />
-                        Restore from customer
+                        Restore from clinic
                       </Button>
                     )}
                   </div>
@@ -633,7 +633,7 @@ export default function InvoiceForm({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Remarks</CardTitle>
-          <p className="text-xs text-gray-500">Internal only — not printed or shown to the customer.</p>
+          <p className="text-xs text-gray-500">Internal only — not printed or shown to the clinic.</p>
         </CardHeader>
         <CardContent>
           <Textarea

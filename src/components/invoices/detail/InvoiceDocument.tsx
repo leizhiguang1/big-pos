@@ -690,9 +690,9 @@ export function InvoiceDocument({
                 onChange={e => setAlsoSaveToCustomer(e.target.checked)}
               />
               <span>
-                Also save to customer record
+                Also save to clinic record
                 <span className="block text-xs text-gray-500">
-                  Updates the master customer with the Bill To values, plus both addresses. Future invoices use these defaults.
+                  Updates the master clinic with the Bill To values, plus both addresses. Future invoices use these defaults.
                 </span>
               </span>
             </label>

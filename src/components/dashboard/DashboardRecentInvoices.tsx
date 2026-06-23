@@ -18,7 +18,7 @@ export function DashboardRecentInvoices({ invoices }: { invoices: DashboardRecen
       <TableHeader>
         <TableRow>
           <TableHead>Invoice</TableHead>
-          <TableHead>Customer</TableHead>
+          <TableHead>Clinic</TableHead>
           <TableHead>Date</TableHead>
           <TableHead>Amount</TableHead>
           <TableHead>Status</TableHead>

@@ -34,7 +34,7 @@ export type NavContext = {
 export const NAV: NavEntry[] = [
   // Daily work — the sidebar.
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, area: 'main' },
-  { href: '/customers', label: 'Customers', icon: Users, area: 'main', permission: 'customers.view' },
+  { href: '/customers', label: 'Clinics', icon: Users, area: 'main', permission: 'customers.view' },
   { href: '/invoices', label: 'Invoices', icon: FileText, area: 'main', permission: 'invoices.view' },
   { href: '/work', label: 'Work', icon: Wrench, area: 'main', permission: 'invoices.view' },
   { href: '/products', label: 'Products', icon: Package, area: 'main', permission: 'products.view' },

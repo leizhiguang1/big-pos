@@ -67,7 +67,7 @@ export function ReportsClient({ from, to, summary }: { from: string; to: string;
         <TabsList>
           <TabsTrigger value="outstanding">Outstanding</TabsTrigger>
           <TabsTrigger value="paid">Paid</TabsTrigger>
-          <TabsTrigger value="customers">By Customer</TabsTrigger>
+          <TabsTrigger value="customers">By Clinic</TabsTrigger>
           <TabsTrigger value="products">By Product</TabsTrigger>
         </TabsList>
 
@@ -79,7 +79,7 @@ export function ReportsClient({ from, to, summary }: { from: string; to: string;
                 <TableHeader>
                   <TableRow>
                     <TableHead>Invoice #</TableHead>
-                    <TableHead>Customer</TableHead>
+                    <TableHead>Clinic</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Aging</TableHead>
                     <TableHead>Amount</TableHead>
@@ -122,7 +122,7 @@ export function ReportsClient({ from, to, summary }: { from: string; to: string;
                 <TableHeader>
                   <TableRow>
                     <TableHead>Invoice #</TableHead>
-                    <TableHead>Customer</TableHead>
+                    <TableHead>Clinic</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
@@ -149,7 +149,7 @@ export function ReportsClient({ from, to, summary }: { from: string; to: string;
 
         <TabsContent value="customers" className="mt-4">
           <Card>
-            <CardHeader><CardTitle className="text-base">Revenue by Customer (Top 10)</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Revenue by Clinic (Top 10)</CardTitle></CardHeader>
             <CardContent>
               {byCustomer.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>

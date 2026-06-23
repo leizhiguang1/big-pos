@@ -56,7 +56,7 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
 
   const columns: Column<InvoiceListRow>[] = [
     { key: 'number', header: 'Invoice #', cell: inv => <span className="font-medium text-primary">{inv.invoice_number}</span> },
-    { key: 'customer', header: 'Customer', cell: inv => <span className="text-muted-foreground">{inv.customers?.clinic_name ?? '—'}</span> },
+    { key: 'customer', header: 'Clinic', cell: inv => <span className="text-muted-foreground">{inv.customers?.clinic_name ?? '—'}</span> },
     { key: 'patient', header: 'Patient', cell: inv => <span className="text-muted-foreground">{inv.patient ?? '—'}</span> },
     { key: 'date', header: 'Date', cell: inv => <span className="text-sm text-muted-foreground">{formatDate(inv.invoice_date)}</span> },
     { key: 'amount', header: 'Amount', align: 'right', cell: inv => <span className="font-medium tabular-nums">{formatCurrency(inv.total)}</span> },
@@ -128,7 +128,7 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceListRow[] }) 
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search invoice #, customer, or patient…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+        <Input placeholder="Search invoice #, clinic, or patient…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
       </div>
 
       <Card>

@@ -33,7 +33,7 @@ export function CustomerListClient({ customers }: { customers: Customer[] }) {
   }, [search, customers])
 
   const columns: Column<Customer>[] = [
-    { key: 'clinic', header: 'Clinic / Name', cell: c => <span className="font-medium text-foreground">{c.clinic_name}</span> },
+    { key: 'clinic', header: 'Clinic', cell: c => <span className="font-medium text-foreground">{c.clinic_name}</span> },
     { key: 'contact', header: 'Contact Person', cell: c => <span className="text-muted-foreground">{c.contact_person ?? '—'}</span> },
     { key: 'phone', header: 'Phone', cell: c => <span className="text-muted-foreground">{c.phone ?? '—'}</span> },
     { key: 'email', header: 'Email', cell: c => <span className="text-muted-foreground">{c.email ?? '—'}</span> },
@@ -44,8 +44,8 @@ export function CustomerListClient({ customers }: { customers: Customer[] }) {
   const emptyState = (
     <EmptyState
       icon={<Users className="h-8 w-8" />}
-      title={view === 'empty-no-results' ? 'No customers match your search' : 'No customers yet'}
-      description={view === 'empty-no-results' ? 'Try a different search term.' : 'Add your first customer to get started.'}
+      title={view === 'empty-no-results' ? 'No clinics match your search' : 'No clinics yet'}
+      description={view === 'empty-no-results' ? 'Try a different search term.' : 'Add your first clinic to get started.'}
     />
   )
 
@@ -53,12 +53,12 @@ export function CustomerListClient({ customers }: { customers: Customer[] }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Customers</h1>
+          <h1 className="text-2xl font-bold text-foreground">Clinics</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{customers.length} registered</p>
         </div>
         {hasPermission('customers.edit') && (
           <Button asChild>
-            <Link href="/customers/new"><Plus className="h-4 w-4 mr-2" />New Customer</Link>
+            <Link href="/customers/new"><Plus className="h-4 w-4 mr-2" />New Clinic</Link>
           </Button>
         )}
       </div>

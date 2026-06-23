@@ -130,7 +130,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <Card className="print:hidden">
           <CardHeader>
             <CardTitle className="text-base">Remarks</CardTitle>
-            <p className="text-xs text-muted-foreground">Internal only — not shown to the customer.</p>
+            <p className="text-xs text-muted-foreground">Internal only — not shown to the clinic.</p>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-foreground whitespace-pre-line">{invoice.notes}</p>

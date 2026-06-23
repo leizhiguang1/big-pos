@@ -276,7 +276,7 @@ export function WorkQueueClient({ rows, stages }: { rows: WorkQueueRow[]; stages
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         <Input
-          placeholder="Search item, invoice, customer…"
+          placeholder="Search item, invoice, clinic…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="pl-9"
