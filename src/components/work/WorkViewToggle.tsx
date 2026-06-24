@@ -27,16 +27,16 @@ export function WorkViewToggle({
   return (
     <div className="space-y-6">
       {/* Page header + view toggle */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Work</h1>
+          <h1 className="text-xl font-bold text-foreground sm:text-2xl">Work</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {rows.length} item{rows.length === 1 ? '' : 's'} across all invoices
           </p>
         </div>
 
         {/* Board | List | Calendar toggle */}
-        <div className="flex items-center rounded-lg border border-border overflow-hidden text-sm">
+        <div className="grid w-full grid-cols-3 overflow-hidden rounded-lg border border-border text-sm sm:flex sm:w-auto sm:items-center">
           <ToggleButton
             active={view === 'board'}
             onClick={() => setView('board')}
@@ -57,7 +57,7 @@ export function WorkViewToggle({
 
       {/* View */}
       {view === 'board' ? (
-        <KanbanBoard rows={rows} statusConfigs={statusConfigs} />
+        <KanbanBoard rows={rows} stages={stages} statusConfigs={statusConfigs} />
       ) : view === 'calendar' ? (
         <CasesCalendar rows={rows} />
       ) : (

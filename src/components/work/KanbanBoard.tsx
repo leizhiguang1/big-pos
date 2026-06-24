@@ -26,16 +26,19 @@ import { todayISODate } from '@/lib/utils'
 import { WORK_STATUSES } from '@/lib/work-status'
 import { workStatusColor, workStatusLabel, type WorkStatusDisplay } from '@/lib/work-status-config'
 import { updateWorkStatusAction } from '@/data/invoice-actions'
-import type { WorkStatus } from '@/lib/database.types'
+import { WorkStageStepper } from '@/components/work/WorkStageStepper'
+import { WorkStatusSelect, ADVANCE_VALUE } from '@/components/work-status-select'
+import { decodeWork, encodeWork, nextWorkStep } from '@/lib/work-stages'
+import type { WorkStatus, WorkStage } from '@/lib/database.types'
 import type { WorkQueueRow } from '@/data/work'
 
 // ─── Optimistic state ───────────────────────────────────────────────────────
 
-type OptimisticItemMove = { id: string; work_status: WorkStatus }
+type OptimisticItemMove = { id: string; work_status: WorkStatus; stage_id: string | null }
 
 function applyOptimisticMove(rows: WorkQueueRow[], move: OptimisticItemMove): WorkQueueRow[] {
   return rows.map(r =>
-    r.id === move.id ? { ...r, work_status: move.work_status, stage_id: null } : r,
+    r.id === move.id ? { ...r, work_status: move.work_status, stage_id: move.stage_id } : r,
   )
 }
 
@@ -44,16 +47,25 @@ function applyOptimisticMove(rows: WorkQueueRow[], move: OptimisticItemMove): Wo
 function ItemCard({
   row,
   today,
+  activeStages,
+  stagesById,
+  statusConfigs,
   onDragStart,
   onClick,
+  onStatusChange,
 }: {
   row: WorkQueueRow
   today: string
+  activeStages: WorkStage[]
+  stagesById: Map<string, WorkStage>
+  statusConfigs: WorkStatusDisplay[]
   onDragStart: (e: React.DragEvent, itemId: string) => void
   onClick: (invoiceId: string | undefined) => void
+  onStatusChange: (row: WorkQueueRow, value: string) => void
 }) {
   const dueDate = row.invoices?.due_date ?? null
   const isPastDue = dueDate != null && dueDate < today && row.work_status !== 'delivered'
+  const isInProgress = row.work_status === 'in_progress'
 
   return (
     <div
@@ -65,26 +77,37 @@ function ItemCard({
         'hover:shadow-md transition-shadow select-none',
       )}
     >
-      {/* Service description — the card's subject */}
-      <div className="font-semibold text-foreground text-sm leading-snug">
-        {row.description}
-      </div>
-
-      {/* Clinic + patient */}
+      <div className="font-semibold text-foreground text-sm leading-snug">{row.description}</div>
       <div className="text-xs text-muted-foreground mt-1 truncate">
         {row.invoices?.customers?.clinic_name ?? '—'}
         {row.invoices?.patient && ` · ${row.invoices.patient}`}
       </div>
 
-      {/* Invoice # + due date */}
+      {/* In-progress sub-stage: stepper when on a stage, Set-stage prompt when not. */}
+      {isInProgress && (
+        <div className="mt-2" onClick={e => e.stopPropagation()}>
+          {row.stage_id ? (
+            <WorkStageStepper activeStages={activeStages} workStatus={row.work_status} stageId={row.stage_id} />
+          ) : (
+            <WorkStatusSelect
+              value={encodeWork(row.work_status, row.stage_id)}
+              onValueChange={v => onStatusChange(row, v)}
+              activeStages={activeStages}
+              workStatus={row.work_status}
+              stageId={row.stage_id}
+              stagesById={stagesById}
+              statusConfigs={statusConfigs}
+              triggerClassName="h-8 w-full text-xs"
+            />
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between mt-2">
-        <span className="text-xs font-mono text-muted-foreground">
-          {row.invoices?.invoice_number ?? '—'}
-        </span>
+        <span className="text-xs font-mono text-muted-foreground">{row.invoices?.invoice_number ?? '—'}</span>
         {dueDate && (
           <span className={cn('text-xs', isPastDue ? 'text-red-600 font-medium' : 'text-muted-foreground')}>
-            Due {dueDate}
-            {isPastDue && ' · overdue'}
+            Due {dueDate}{isPastDue && ' · overdue'}
           </span>
         )}
       </div>
@@ -96,18 +119,24 @@ function KanbanColumn({
   status,
   rows,
   today,
+  activeStages,
+  stagesById,
   onDragStart,
   onDrop,
   onCardClick,
   statusConfigs,
+  onStatusChange,
 }: {
   status: WorkStatus
   rows: WorkQueueRow[]
   today: string
+  activeStages: WorkStage[]
+  stagesById: Map<string, WorkStage>
   onDragStart: (e: React.DragEvent, itemId: string) => void
   onDrop: (e: React.DragEvent, targetStatus: WorkStatus) => void
   onCardClick: (invoiceId: string | undefined) => void
   statusConfigs: WorkStatusDisplay[]
+  onStatusChange: (row: WorkQueueRow, value: string) => void
 }) {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -116,7 +145,7 @@ function KanbanColumn({
 
   return (
     <div
-      className="flex flex-col w-72 shrink-0"
+      className="flex w-[min(18rem,82vw)] shrink-0 flex-col sm:w-72"
       onDragOver={handleDragOver}
       onDrop={e => onDrop(e, status)}
     >
@@ -146,8 +175,12 @@ function KanbanColumn({
             key={r.id}
             row={r}
             today={today}
+            activeStages={activeStages}
+            stagesById={stagesById}
+            statusConfigs={statusConfigs}
             onDragStart={onDragStart}
             onClick={onCardClick}
+            onStatusChange={onStatusChange}
           />
         ))}
         {rows.length === 0 && (
@@ -162,7 +195,7 @@ function KanbanColumn({
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export function KanbanBoard({ rows, statusConfigs }: { rows: WorkQueueRow[]; statusConfigs: WorkStatusDisplay[] }) {
+export function KanbanBoard({ rows, stages, statusConfigs }: { rows: WorkQueueRow[]; stages: WorkStage[]; statusConfigs: WorkStatusDisplay[] }) {
   const router = useRouter()
   const { show } = useToast()
   const [, startTransition] = useTransition()
@@ -174,6 +207,9 @@ export function KanbanBoard({ rows, statusConfigs }: { rows: WorkQueueRow[]; sta
     applyOptimisticMove,
   )
 
+  const stagesById = useMemo(() => new Map(stages.map(s => [s.id, s])), [stages])
+  const activeStages = useMemo(() => stages.filter(s => s.is_active), [stages])
+
   // Group items into columns by their own work status.
   const rowsByStatus = useMemo(() => {
     const map = new Map<WorkStatus, WorkQueueRow[]>()
@@ -183,6 +219,25 @@ export function KanbanBoard({ rows, statusConfigs }: { rows: WorkQueueRow[]; sta
     }
     return map
   }, [optimisticRows])
+
+  // Apply a (work_status, stage_id) move for one item: optimistic + server.
+  const applyMove = (itemId: string, work_status: WorkStatus, stage_id: string | null) => {
+    startTransition(async () => {
+      applyOptimistic({ id: itemId, work_status, stage_id })
+      const res = await updateWorkStatusAction(itemId, { work_status, stage_id })
+      if (res.ok === false) show({ variant: 'error', title: res.error })
+      router.refresh()
+    })
+  }
+
+  // Set-stage dropdown change on a card (resolves Advance + Resume-less sentinels).
+  const onCardStatusChange = (row: WorkQueueRow, value: string) => {
+    const resolved = value === ADVANCE_VALUE
+      ? nextWorkStep(activeStages, row.work_status, row.stage_id)
+      : decodeWork(value)
+    if (!resolved) return
+    applyMove(row.id, resolved.work_status, resolved.stage_id)
+  }
 
   const handleDragStart = (e: React.DragEvent, itemId: string) => {
     e.dataTransfer.setData('text/plain', itemId)
@@ -198,7 +253,7 @@ export function KanbanBoard({ rows, statusConfigs }: { rows: WorkQueueRow[]; sta
     if (!row || row.work_status === targetStatus) return
 
     startTransition(async () => {
-      applyOptimistic({ id: itemId, work_status: targetStatus })
+      applyOptimistic({ id: itemId, work_status: targetStatus, stage_id: null })
       // Dropping into a status column resets the in-progress substage; the board
       // only models the five top-level statuses. resume_status is handled server-side.
       const res = await updateWorkStatusAction(itemId, { work_status: targetStatus, stage_id: null })
@@ -214,7 +269,7 @@ export function KanbanBoard({ rows, statusConfigs }: { rows: WorkQueueRow[]; sta
   }
 
   return (
-    <div className="overflow-x-auto pb-4">
+    <div className="-mx-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
       <div className="flex gap-4 min-w-max">
         {WORK_STATUSES.map(status => (
           <KanbanColumn
@@ -222,10 +277,13 @@ export function KanbanBoard({ rows, statusConfigs }: { rows: WorkQueueRow[]; sta
             status={status}
             rows={rowsByStatus.get(status) ?? []}
             today={today}
+            activeStages={activeStages}
+            stagesById={stagesById}
+            statusConfigs={statusConfigs}
             onDragStart={handleDragStart}
             onDrop={handleDrop}
             onCardClick={handleCardClick}
-            statusConfigs={statusConfigs}
+            onStatusChange={onCardStatusChange}
           />
         ))}
       </div>
