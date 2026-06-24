@@ -264,10 +264,22 @@ export async function getWorkStatusConfigs(): Promise<WorkStatusConfig[]> {
 // Reference data for the form — mirrors `InvoiceForm.tsx`'s mount-time reads:
 //   customers ordered by clinic_name, active products by created_at,
 //   active service statuses.
-export async function getInvoiceFormData(): Promise<InvoiceFormData> {
+export async function getInvoiceFormData(
+  opts?: { includeCustomerId?: string },
+): Promise<InvoiceFormData> {
   const supabase = await createClient()
+
+  // Picker shows active clinics only — you can't bill an archived clinic. In
+  // edit mode we also include the invoice's own clinic (even if archived) so the
+  // dropdown still shows its name.
+  let customersQuery = supabase.from('customers').select('*')
+  customersQuery = opts?.includeCustomerId
+    ? customersQuery.or(`archived_at.is.null,id.eq.${opts.includeCustomerId}`)
+    : customersQuery.is('archived_at', null)
+  customersQuery = customersQuery.order('clinic_name')
+
   const [cRes, pRes, ssRes, billingSettings] = await Promise.all([
-    supabase.from('customers').select('*').order('clinic_name'),
+    customersQuery,
     supabase.from('products').select('*').eq('active', true).order('created_at'),
     supabase.from('service_statuses').select('*').eq('is_active', true).order('sort_order').order('label'),
     getBillingSettings(),

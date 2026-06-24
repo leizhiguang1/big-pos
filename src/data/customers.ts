@@ -21,7 +21,11 @@ export type CustomerDetail = {
 //   .select('*').order('clinic_name')
 export async function getCustomers(): Promise<Customer[]> {
   const supabase = await createClient()
-  const { data } = await supabase.from('customers').select('*').order('clinic_name')
+  const { data } = await supabase
+    .from('customers')
+    .select('*')
+    .is('archived_at', null)
+    .order('clinic_name')
   return (data ?? []) as Customer[]
 }
 
@@ -33,6 +37,7 @@ export interface CustomerListParams {
   pageSize?: number
   sort?: string | null
   dir?: 'asc' | 'desc'
+  archived?: boolean
 }
 
 export interface CustomerListPage {
@@ -57,7 +62,7 @@ const CUSTOMER_SORT_COLUMNS: Record<string, string> = {
  * phone (all base-table columns, so the whole filter lives in SQL).
  */
 export async function getCustomersPage(params: CustomerListParams = {}): Promise<CustomerListPage> {
-  const { q = '', page = 1, pageSize = 15, sort = null, dir = 'asc' } = params
+  const { q = '', page = 1, pageSize = 15, sort = null, dir = 'asc', archived = false } = params
   const supabase = await createClient()
 
   const sortCol = (sort && CUSTOMER_SORT_COLUMNS[sort]) || 'clinic_name'
@@ -66,6 +71,9 @@ export async function getCustomersPage(params: CustomerListParams = {}): Promise
     .from('customers')
     .select('*', { count: 'exact' })
     .order(sortCol, { ascending: dir !== 'desc' })
+
+  // Active view (default) hides archived clinics; the "Archived" view shows only them.
+  query = archived ? query.not('archived_at', 'is', null) : query.is('archived_at', null)
 
   const term = q.trim()
   if (term) {
