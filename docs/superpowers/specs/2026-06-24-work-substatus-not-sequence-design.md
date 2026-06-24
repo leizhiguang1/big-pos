@@ -94,8 +94,10 @@ stage pills — **no numbering, no connector tree, no advance-stage row**:
   today to remove a sub-status once set.
 - The `IN PROGRESS` header stays so the rows clearly read as sub-statuses *of* In Progress.
 - The `leadingItems` prop (the on-hold **Resume** row) is preserved, still above Received.
-- The `ADVANCE_VALUE` sentinel + the "Advance to <next stage>" primary row are **removed**
-  from this control (see §4 for what replaces the advance action).
+- The `ADVANCE_VALUE` "Advance" row is **kept** but now advances the **top-level** status
+  only (via the simplified `nextWorkStep` in §4) — e.g. `Advance to In Progress`,
+  `Advance to Ready`, `Advance to Delivered`. It **no longer walks stage→stage**. The
+  numbering (`①②③④`) and the connector tree are removed.
 
 > **Bare in-progress is a first-class state.** Its label is the plain `In Progress` (never a
 > blank pill); its chip row renders with no chip highlighted. It is what `received → advance`
@@ -114,12 +116,14 @@ nextWorkStep(work_status): { work_status; stage_id } | null
   on_hold      → null                               // Resume covers it
 ```
 
-- No longer depends on `activeStages` or the current `stage_id`.
+- No longer depends on `activeStages` or the current `stage_id` — its signature drops to
+  `nextWorkStep(work_status)`. All three call sites (editor, queue, board) update accordingly.
 - Advancing `received → in_progress` lands the item as **bare in-progress**, which triggers
   the existing board **"Set stage"** prompt — the sub-status is an explicit pick, never
   auto-assigned to "stage 1".
-- Wherever a one-click advance is surfaced (board card action), it advances the top-level
-  status using this helper. Setting a specific sub-stage is always done via the dropdown.
+- The one-click advance stays surfaced in the shared dropdown's "Advance" row; it advances
+  the top-level status using this helper. Setting a specific sub-stage is always a separate
+  explicit pick from the same dropdown.
 
 ### 5. Settings config — `/settings/work-stages`
 
