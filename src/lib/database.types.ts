@@ -35,6 +35,7 @@ export type CreditReason = 'remake' | 'return' | 'goodwill'
 export type Customer = Tables<'customers'>
 export type Product = Tables<'products'>
 export type ServiceStatus = Tables<'service_statuses'>
+export type WorkStatusConfig = Tables<'work_status_configs'>
 export type WorkStage = Tables<'work_stages'>
 export type Unit = Tables<'units'>
 export type Role = Tables<'roles'>

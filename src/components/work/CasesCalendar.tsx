@@ -2,21 +2,18 @@
 
 // Calendar view for the Work page. Lays out CASES (invoices) on a month grid by
 // their `due_date`. Each day cell lists the cases due that day (invoice #, clinic,
-// patient, dominant WorkStatusBadge); clicking a case navigates to its invoice.
+// patient); clicking a case navigates to its invoice, where per-item work status
+// lives. Work status is tracked per service item, never rolled up to the case.
 //
 // Dependency-free: the month grid is built with plain Date math (no calendar npm
 // package). Cases with no due_date drop into a "No due date" bucket below the grid.
 //
-// Grouping mirrors KanbanBoard: rows are grouped by invoices.id into cases, and a
-// case's badge uses dominantWorkStatus(item work_statuses).
+// Grouping mirrors KanbanBoard: rows are grouped by invoices.id into cases.
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn, todayISODate } from '@/lib/utils'
-import { dominantWorkStatus } from '@/lib/work-status'
-import { WorkStatusBadge } from '@/components/work-status-badge'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { WorkStatus } from '@/lib/database.types'
 import type { WorkQueueRow } from '@/data/work'
 
 // ─── Case grouping ──────────────────────────────────────────────────────────
@@ -27,36 +24,25 @@ type CalendarCase = {
   clinicName: string
   patient: string | null
   dueDate: string | null
-  dominant: WorkStatus
 }
 
 function groupIntoCases(rows: WorkQueueRow[]): CalendarCase[] {
-  const map = new Map<string, { meta: Omit<CalendarCase, 'dominant'>; statuses: WorkStatus[] }>()
+  const map = new Map<string, CalendarCase>()
   for (const row of rows) {
     if (!row.invoices) continue
     const { id: invoiceId, invoice_number, patient, due_date } = row.invoices
     const clinicName = row.invoices.customers?.clinic_name ?? '—'
     if (!map.has(invoiceId)) {
       map.set(invoiceId, {
-        meta: {
-          invoiceId,
-          invoiceNumber: invoice_number,
-          clinicName,
-          patient: patient ?? null,
-          dueDate: due_date ?? null,
-        },
-        statuses: [],
+        invoiceId,
+        invoiceNumber: invoice_number,
+        clinicName,
+        patient: patient ?? null,
+        dueDate: due_date ?? null,
       })
     }
-    map.get(invoiceId)!.statuses.push(row.work_status)
   }
-
-  const cases: CalendarCase[] = []
-  for (const { meta, statuses } of map.values()) {
-    const dominant = dominantWorkStatus(statuses)
-    if (dominant !== null) cases.push({ ...meta, dominant })
-  }
-  return cases
+  return [...map.values()]
 }
 
 // ─── Month grid date math ────────────────────────────────────────────────────
@@ -112,10 +98,7 @@ function CaseChip({ kase, onClick }: { kase: CalendarCase; onClick: () => void }
         'hover:shadow-sm transition-shadow',
       )}
     >
-      <div className="flex items-center justify-between gap-1">
-        <span className="font-mono text-[10px] text-muted-foreground truncate">{kase.invoiceNumber}</span>
-        <WorkStatusBadge status={kase.dominant} className="px-1.5 py-0 text-[10px]" />
-      </div>
+      <span className="font-mono text-[10px] text-muted-foreground truncate">{kase.invoiceNumber}</span>
       <div className="text-[11px] font-medium text-foreground leading-tight truncate">{kase.clinicName}</div>
       {kase.patient && (
         <div className="text-[10px] text-muted-foreground leading-tight truncate">{kase.patient}</div>

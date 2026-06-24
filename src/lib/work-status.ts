@@ -49,26 +49,9 @@ export const WORK_STATUS_OUTLINED: Record<WorkStatus, string> = {
   on_hold:     'bg-white border border-orange-500 text-orange-700',
 }
 
-// Priority order for picking ONE representative status across many items
-// belonging to a single invoice. On-hold first (needs attention), then the
-// least-progressed stage. Delivered is last because work that's out the door
-// is the least useful single-line answer to "where's my order".
-const DOMINANT_PRIORITY: WorkStatus[] = [
-  'on_hold',
-  'received',
-  'in_progress',
-  'ready',
-  'delivered',
-]
-
-export function dominantWorkStatus(statuses: WorkStatus[]): WorkStatus | null {
-  if (statuses.length === 0) return null
-  const set = new Set(statuses)
-  for (const s of DOMINANT_PRIORITY) {
-    if (set.has(s)) return s
-  }
-  return null
-}
+// Work status is tracked per service item (one invoice line = one work), never
+// rolled up to a single invoice-level status. Aggregation helpers
+// (dominantWorkStatus / summarizeWorkStatuses) were removed deliberately.
 
 const LINEAR_FLOW: WorkStatus[] = ['received', 'in_progress', 'ready', 'delivered']
 
@@ -76,19 +59,4 @@ export function nextWorkStatus(current: WorkStatus): WorkStatus | null {
   const idx = LINEAR_FLOW.indexOf(current)
   if (idx === -1 || idx === LINEAR_FLOW.length - 1) return null
   return LINEAR_FLOW[idx + 1]
-}
-
-export function summarizeWorkStatuses(statuses: WorkStatus[]): {
-  primary: WorkStatus | null
-  breakdown: Array<{ status: WorkStatus; count: number }>
-} {
-  if (statuses.length === 0) return { primary: null, breakdown: [] }
-  const counts = new Map<WorkStatus, number>()
-  for (const s of statuses) counts.set(s, (counts.get(s) ?? 0) + 1)
-  const breakdown = WORK_STATUSES.filter(s => counts.has(s)).map(s => ({
-    status: s,
-    count: counts.get(s)!,
-  }))
-  const primary = breakdown.length === 1 ? breakdown[0].status : null
-  return { primary, breakdown }
 }

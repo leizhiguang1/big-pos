@@ -18,15 +18,16 @@ import { WorkStatusSelect } from '@/components/work-status-select'
 import { WorkStageStepper } from '@/components/work/WorkStageStepper'
 import { encodeWork, decodeWork, workLabel, workColor } from '@/lib/work-stages'
 import { updateWorkStatusAction, updateWorkNoteAction } from '@/data/invoice-actions'
-import type { InvoiceItem, InvoiceItemStatusHistory, WorkStage } from '@/lib/database.types'
+import type { InvoiceItem, InvoiceItemStatusHistory, WorkStage, WorkStatusConfig } from '@/lib/database.types'
 
 export type WorkStatusEditorProps = {
   items: InvoiceItem[]
   history: InvoiceItemStatusHistory[]
   stages: WorkStage[]
+  statusConfigs: WorkStatusConfig[]
 }
 
-export function WorkStatusEditor({ items, history, stages }: WorkStatusEditorProps) {
+export function WorkStatusEditor({ items, history, stages, statusConfigs }: WorkStatusEditorProps) {
   const router = useRouter()
   const { show } = useToast()
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -85,6 +86,7 @@ export function WorkStatusEditor({ items, history, stages }: WorkStatusEditorPro
                     workStatus={item.work_status}
                     stageId={item.stage_id}
                     stagesById={stagesById}
+                    statusConfigs={statusConfigs}
                   />
                   <WorkStageStepper
                     activeStages={activeStages}
@@ -133,12 +135,12 @@ export function WorkStatusEditor({ items, history, stages }: WorkStatusEditorPro
                             {h.status === 'in_progress' && h.stage_id ? (
                               <span className={cn(
                                 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap',
-                                workColor(h.status, h.stage_id, stagesById),
+                                workColor(h.status, h.stage_id, stagesById, statusConfigs),
                               )}>
-                                {workLabel(h.status, h.stage_id, stagesById)}
+                                {workLabel(h.status, h.stage_id, stagesById, statusConfigs)}
                               </span>
                             ) : (
-                              <WorkStatusBadge status={h.status} />
+                              <WorkStatusBadge status={h.status} statusConfigs={statusConfigs} />
                             )}
                           </TableCell>
                           <TableCell className="text-sm text-gray-600">

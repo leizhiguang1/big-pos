@@ -9,7 +9,7 @@
 // Writes live in `./invoice-actions.ts` (`updateWorkStatusAction`).
 
 import { createClient } from '@/lib/supabase/server'
-import type { InvoiceItem, WorkStage, WorkStatus } from '@/lib/database.types'
+import type { InvoiceItem, WorkStage, WorkStatus, WorkStatusConfig } from '@/lib/database.types'
 
 // One work-queue row: the invoice item fields the page reads, plus the embedded
 // invoice + customer shape the select returns. Composed from the schema-driven
@@ -41,10 +41,10 @@ export type WorkQueueRow = Pick<
 //     .order('id', { ascending: true })
 //   then filter out items whose parent invoice is voided (voided_at != null);
 //   work_stages.select('*').order('sort_order').order('label') (== fetchWorkStages).
-export async function getWorkQueue(): Promise<{ rows: WorkQueueRow[]; stages: WorkStage[] }> {
+export async function getWorkQueue(): Promise<{ rows: WorkQueueRow[]; stages: WorkStage[]; statusConfigs: WorkStatusConfig[] }> {
   const supabase = await createClient()
 
-  const [itemsRes, stagesRes] = await Promise.all([
+  const [itemsRes, stagesRes, statusConfigsRes] = await Promise.all([
     supabase
       .from('invoice_items')
       .select(
@@ -53,11 +53,16 @@ export async function getWorkQueue(): Promise<{ rows: WorkQueueRow[]; stages: Wo
       .order('work_status_updated_at', { ascending: false })
       .order('id', { ascending: true }),
     supabase.from('work_stages').select('*').order('sort_order').order('label'),
+    supabase.from('work_status_configs').select('*').order('sort_order'),
   ])
 
   const rows = ((itemsRes.data ?? []) as unknown as WorkQueueRow[]).filter(
     r => r.invoices != null && r.invoices.voided_at == null,
   )
 
-  return { rows, stages: (stagesRes.data ?? []) as WorkStage[] }
+  return {
+    rows,
+    stages: (stagesRes.data ?? []) as WorkStage[],
+    statusConfigs: (statusConfigsRes.data ?? []) as WorkStatusConfig[],
+  }
 }

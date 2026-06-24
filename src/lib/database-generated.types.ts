@@ -72,15 +72,12 @@ export type Database = {
           contact_person: string | null
           created_at: string
           delivery_address: string | null
-          discount_pct: number
           email: string | null
           id: string
           notes: string | null
           payment_terms_days: number
           phone: string | null
           ssm_no: string | null
-          tin: string | null
-          whatsapp_optin: boolean
         }
         Insert: {
           billing_address?: string | null
@@ -88,15 +85,12 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           delivery_address?: string | null
-          discount_pct?: number
           email?: string | null
           id?: string
           notes?: string | null
           payment_terms_days?: number
           phone?: string | null
           ssm_no?: string | null
-          tin?: string | null
-          whatsapp_optin?: boolean
         }
         Update: {
           billing_address?: string | null
@@ -174,6 +168,7 @@ export type Database = {
           product_id: string | null
           quantity: number
           resume_status: Database["public"]["Enums"]["work_status"] | null
+          sort_order: number
           stage_id: string | null
           unit_price: number
           work_note: string | null
@@ -189,6 +184,7 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           resume_status?: Database["public"]["Enums"]["work_status"] | null
+          sort_order?: number
           stage_id?: string | null
           unit_price?: number
           work_note?: string | null
@@ -204,6 +200,7 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           resume_status?: Database["public"]["Enums"]["work_status"] | null
+          sort_order?: number
           stage_id?: string | null
           unit_price?: number
           work_note?: string | null
@@ -555,6 +552,30 @@ export type Database = {
           is_active?: boolean
           label?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      work_status_configs: {
+        Row: {
+          color: string | null
+          created_at: string
+          label: string
+          sort_order: number
+          status: Database["public"]["Enums"]["work_status"]
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          label: string
+          sort_order: number
+          status: Database["public"]["Enums"]["work_status"]
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          label?: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["work_status"]
         }
         Relationships: []
       }

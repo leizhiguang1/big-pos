@@ -8,12 +8,20 @@ import { cn } from '@/lib/utils'
 import { KanbanBoard } from '@/components/work/KanbanBoard'
 import { WorkQueueClient } from '@/components/work/WorkQueueClient'
 import { CasesCalendar } from '@/components/work/CasesCalendar'
-import type { WorkStage } from '@/lib/database.types'
+import type { WorkStage, WorkStatusConfig } from '@/lib/database.types'
 import type { WorkQueueRow } from '@/data/work'
 
 type ViewMode = 'board' | 'list' | 'calendar'
 
-export function WorkViewToggle({ rows, stages }: { rows: WorkQueueRow[]; stages: WorkStage[] }) {
+export function WorkViewToggle({
+  rows,
+  stages,
+  statusConfigs,
+}: {
+  rows: WorkQueueRow[]
+  stages: WorkStage[]
+  statusConfigs: WorkStatusConfig[]
+}) {
   const [view, setView] = useState<ViewMode>('board')
 
   return (
@@ -49,11 +57,11 @@ export function WorkViewToggle({ rows, stages }: { rows: WorkQueueRow[]; stages:
 
       {/* View */}
       {view === 'board' ? (
-        <KanbanBoard rows={rows} />
+        <KanbanBoard rows={rows} statusConfigs={statusConfigs} />
       ) : view === 'calendar' ? (
         <CasesCalendar rows={rows} />
       ) : (
-        <WorkQueueClient rows={rows} stages={stages} hideHeader />
+        <WorkQueueClient rows={rows} stages={stages} statusConfigs={statusConfigs} hideHeader />
       )}
     </div>
   )

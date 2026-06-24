@@ -2,6 +2,14 @@
 
 **Date:** 2026-06-24
 **Status:** Approved (pending spec review)
+
+> **Update 2026-06-24:** Section 5 (the invoice-level "WorkSummaryBadge" breakdown)
+> was **superseded** before implementation. The decision is now: work status is
+> tracked **per service item only and is never shown at the invoice level at all**
+> — no single badge, no breakdown chips, no work-based invoice filters. All
+> invoice-level roll-ups have been removed (see the revised Section 5). Per-item
+> work status lives on the board, the work list, and the invoice-detail Work
+> Status editor.
 **Scope:** Make the in-progress sub-stage a first-class, visible, filterable, and easily-changeable concept across every surface — and make it unmistakable that work status is tracked **per work item, not per invoice**.
 
 ---
@@ -20,7 +28,7 @@ Status is stored **per invoice line item** (each line item = one "work"/service)
 1. **Sub-stages are hard to *see*.** On the board the in-progress column flattens all stages into one; a drop silently clears `stage_id`. The stepper only renders on the invoice-detail page.
 2. **Sub-stages can't be *filtered*.** The work-queue filter chips only filter the 5 top-level statuses.
 3. **The *change* control is cramped and ambiguous.** The dropdown is a small `h-8 w-44 text-xs` pill; sub-stages are buried under a plain "In Progress" group label and don't read as ordered steps.
-4. **Invoice-level status is misleading.** Three places collapse all of an invoice's works into one `dominantWorkStatus` badge, implying the invoice has a single status.
+4. **Invoice-level status is misleading.** Three places collapse all of an invoice's works into one `dominantWorkStatus` badge, implying the invoice has a single status. *(Resolved by removing invoice-level work status outright — see Section 5.)*
 
 ---
 
@@ -31,7 +39,7 @@ Status is stored **per invoice line item** (each line item = one "work"/service)
 - The in-progress sub-stage is visible at a glance everywhere an in-progress item appears.
 - Filter the work queue down to a single in-progress sub-stage.
 - One-click "advance to next step."
-- Invoice-level roll-ups clearly communicate "N works with these statuses," never a single fake invoice status.
+- Invoice-level work status is removed entirely — work status is a per-service-item concept and never appears at the invoice level.
 
 **Non-goals (deferred fast-follows)**
 - Board sub-stage **swimlanes** (dragging Carving→Layering natively on the board).
@@ -127,23 +135,19 @@ Linear progression:
 
 The menu's advance row is labeled with its resolved target (e.g. "Advance to Ready") so it's never ambiguous. Selecting it calls the same `updateWorkStatusAction` path as any other move (optimistic + auto-revert preserved). Unit-tested.
 
-### 5. Per-work clarity — new `WorkSummaryBadge`
+### 5. Invoice-level work status removed (revised)
 
-A shared component that replaces the raw `dominantWorkStatus → WorkStatusBadge` usage in the three invoice-level spots, so a roll-up never masquerades as a single invoice status.
+> Superseded the original "WorkSummaryBadge breakdown" plan. The decision is **no
+> invoice-level work status of any kind** — not a single badge, not breakdown
+> chips. Work status is per service item; the invoice does not have one.
 
-- **Input:** the list of an invoice's works' top-level `work_status` values (stage detail is not needed at the invoice level).
-- **Behavior** (uses the existing `summarizeWorkStatuses` helper in `src/lib/work-status.ts`):
-  - 0 works → `—`
-  - all works share one status → a single badge, with a count when >1: `In Progress ×3`
-  - mixed statuses → **breakdown chips** in canonical order: `2 In Progress · 1 Ready`
-- **Density variants:** the invoices list and detail header show the full breakdown chips; the calendar cell (very tight) shows a compact colored count form with the full breakdown in a tooltip.
+**Removed (done 2026-06-24):**
+- Invoice detail header "Work" chip — `src/app/(authenticated)/invoices/[id]/page.tsx`
+- Invoices list "Work" column **and** the "In production" / "Ready to deliver" view tabs — `src/components/invoices/InvoiceListClient.tsx` + the `in_production`/`ready` entries in `InvoiceView`, the derived-view predicates, and the per-view counts in `src/data/invoices.ts` (the `invoice_items(work_status)` join was dropped from the list selects too).
+- Cases calendar per-case badge — `src/components/work/CasesCalendar.tsx` (and its now-unused `statusConfigs` prop).
+- Dead aggregation helpers: `dominantWorkStatus` + `summarizeWorkStatuses` (`src/lib/work-status.ts`) and the whole `src/domain/aggregation.ts` (`dominantProductionStatus`/`summarizeProduction`) + its barrel export.
 
-**Replaces aggregate usage in:**
-- Invoices list "Work" column — `src/components/invoices/InvoiceListClient.tsx`
-- Invoice detail header "Work" row — `src/app/(authenticated)/invoices/[id]/page.tsx`
-- Cases calendar — `src/components/work/CasesCalendar.tsx`
-
-All other surfaces already show status per work and stay as-is (work queue, invoice-detail Work Status table + history, printed invoice).
+All work-status visibility now lives **only** on per-item surfaces: the work queue/board, the invoice-detail Work Status table + history, and the printed invoice's per-item production column.
 
 ---
 
@@ -157,10 +161,11 @@ All other surfaces already show status per work and stay as-is (work queue, invo
 | `src/components/work/WorkStageStepper.tsx` | Reuse on board cards + list rows; minor variant props if needed |
 | `src/components/work/WorkQueueClient.tsx` | Sub-stage drill-down filter (`FilterMode` += `stage:<id>`); stepper on rows + group headers; separated meta chips |
 | `src/components/work/KanbanBoard.tsx` | Stage badge + stepper on in-progress cards; "Set stage" prompt on stage-less cards |
-| `src/components/work/WorkSummaryBadge.tsx` | **New** — per-work roll-up badge / breakdown chips |
-| `src/components/invoices/InvoiceListClient.tsx` | Use `WorkSummaryBadge` in the Work column |
-| `src/app/(authenticated)/invoices/[id]/page.tsx` | Use `WorkSummaryBadge` in the header Work row |
-| `src/components/work/CasesCalendar.tsx` | Use `WorkSummaryBadge` (compact variant) per case |
+| `src/components/invoices/InvoiceListClient.tsx` | **Remove** the Work column + the "In production"/"Ready to deliver" view tabs |
+| `src/app/(authenticated)/invoices/[id]/page.tsx` | **Remove** the header Work chip |
+| `src/components/work/CasesCalendar.tsx` | **Remove** the per-case Work badge |
+| `src/data/invoices.ts` | **Remove** `in_production`/`ready` from `InvoiceView` + predicates/counts; drop the `invoice_items(work_status)` list join |
+| `src/lib/work-status.ts` / `src/domain/aggregation.ts` | **Delete** `dominantWorkStatus`, `summarizeWorkStatuses`, and the dead `aggregation` module |
 | `src/components/invoices/detail/WorkStatusEditor.tsx` | Inherits the shared control automatically; verify spacing |
 | **DB data** | Relabel stage `Try-in` → `Try In` (same `id`) |
 
@@ -176,7 +181,7 @@ No schema/RLS/permission/server-action contract changes.
   - `/work` board — in-progress cards show stage + stepper; drop into In Progress shows "Set stage"; Advance moves one step.
   - `/work` list — In Progress chip reveals sub-stage chips with counts; selecting one filters; stepper on rows + headers.
   - An invoice detail — dropdown shows numbered steps + Advance; changing a single line item updates only that work.
-  - Invoices list + calendar — a mixed-status invoice shows the breakdown, a uniform one shows `Status ×N`.
+  - Invoices list + calendar + invoice header — no work-status badge appears at the invoice level at all; work status is visible only per item.
 
 ---
 

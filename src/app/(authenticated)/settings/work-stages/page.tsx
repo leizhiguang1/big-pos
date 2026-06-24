@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -12,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ArrowLeft, Plus, Pencil, ToggleLeft, ToggleRight, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Pencil, ToggleLeft, ToggleRight, ArrowUp, ArrowDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkStage } from '@/lib/database.types'
 import { COLOR_PRESETS, DEFAULT_COLOR } from '@/lib/service-status'
@@ -115,12 +114,9 @@ export default function WorkStagesPage() {
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/settings">
-            <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
-          </Link>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Work Stages</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Steps a job moves through while In Progress (Custom Tray, Try-in, Finish &amp; Polish…).</p>
+            <h1 className="text-2xl font-bold text-foreground">In-Progress Stages</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Sub-steps shown inside the In Progress work status.</p>
           </div>
         </div>
         {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Stage</Button>}

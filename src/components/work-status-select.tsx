@@ -1,37 +1,39 @@
 'use client'
 
-// Shared work-status dropdown: a colored trigger pill plus grouped options with
-// a color dot per option. The four configurable stages sit under an
-// "In Progress" group header. Used by the invoice-detail Work Status card and
-// the work queue so both render identically.
+// Shared work-status dropdown: a colored trigger pill plus colored option pills.
+// Configurable stages sit under an "In Progress" group header. Used by the
+// invoice-detail Work Status card and the work queue so both render identically.
 
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import {
-  encodeWork, workColor, workLabel, dotColorClass, STAGE_DEFAULT_COLOR, type WorkOption,
+  encodeWork, workColor, workLabel, STAGE_DEFAULT_COLOR, type WorkOption,
 } from '@/lib/work-stages'
-import { WORK_STATUS_LABELS, WORK_STATUS_COLORS } from '@/lib/work-status'
+import { workStatusColor, workStatusLabel, type WorkStatusDisplay } from '@/lib/work-status-config'
 import type { WorkStage, WorkStatus } from '@/lib/database.types'
-
-function Dot({ color }: { color: string }) {
-  return <span className={cn('h-2 w-2 shrink-0 rounded-full', dotColorClass(color))} />
-}
 
 function OptionRow({ option }: { option: WorkOption }) {
   return (
-    <span className="flex items-center gap-2">
-      <Dot color={option.color} />
-      {option.label}
+    <span className={cn('inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-sm font-medium leading-5', option.color)}>
+      <span className="truncate">{option.label}</span>
     </span>
   )
 }
 
-const fixed = (status: WorkStatus): WorkOption => ({
+function WorkOptionItem({ option }: { option: WorkOption }) {
+  return (
+    <SelectItem value={option.value} textValue={option.label} className="py-2">
+      <OptionRow option={option} />
+    </SelectItem>
+  )
+}
+
+const fixed = (status: WorkStatus, statusConfigs?: WorkStatusDisplay[]): WorkOption => ({
   value: status,
-  label: WORK_STATUS_LABELS[status],
-  color: WORK_STATUS_COLORS[status],
+  label: workStatusLabel(status, statusConfigs),
+  color: workStatusColor(status, statusConfigs),
 })
 
 export function WorkStatusSelect({
@@ -41,6 +43,7 @@ export function WorkStatusSelect({
   workStatus,
   stageId,
   stagesById,
+  statusConfigs,
   triggerClassName,
   leadingItems,
 }: {
@@ -50,10 +53,12 @@ export function WorkStatusSelect({
   workStatus: WorkStatus
   stageId: string | null
   stagesById: Map<string, WorkStage>
+  statusConfigs?: WorkStatusDisplay[]
   triggerClassName?: string
   // Extra action items rendered above "Received" (e.g. the work queue's
-  // "Resume" option for on-hold cards). Plain label, no color dot.
-  leadingItems?: { value: string; label: string }[]
+  // "Resume" option for on-hold cards). Can carry a color when it points to a
+  // concrete work status.
+  leadingItems?: Array<{ value: string; label: string; color?: string; colorLabel?: string }>
 }) {
   // In-Progress group: the active stages, plus the item's current value when it
   // sits on a retired stage / bare in-progress (so it stays selectable + visible).
@@ -67,8 +72,8 @@ export function WorkStatusSelect({
   if (isInProgressValue && !inProgress.some(o => o.value === current)) {
     inProgress.unshift({
       value: current,
-      label: workLabel(workStatus, stageId, stagesById),
-      color: workColor(workStatus, stageId, stagesById),
+      label: workLabel(workStatus, stageId, stagesById, statusConfigs),
+      color: workColor(workStatus, stageId, stagesById, statusConfigs),
     })
   }
 
@@ -77,7 +82,7 @@ export function WorkStatusSelect({
       <SelectTrigger
         className={cn(
           'h-8 w-44 text-xs font-medium border-transparent',
-          workColor(workStatus, stageId, stagesById),
+          workColor(workStatus, stageId, stagesById, statusConfigs),
           triggerClassName,
         )}
       >
@@ -87,21 +92,32 @@ export function WorkStatusSelect({
         {leadingItems && leadingItems.length > 0 && (
           <>
             {leadingItems.map(o => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              o.color ? (
+                <SelectItem key={o.value} value={o.value} textValue={o.label} className="py-2">
+                  <span className="flex max-w-full items-center gap-2">
+                    <span className="shrink-0 text-sm">{o.label}</span>
+                    <span className={cn('inline-flex min-w-0 items-center rounded-full px-2.5 py-0.5 text-sm font-medium leading-5', o.color)}>
+                      <span className="truncate">{o.colorLabel ?? o.label}</span>
+                    </span>
+                  </span>
+                </SelectItem>
+              ) : (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              )
             ))}
             <SelectSeparator />
           </>
         )}
-        <SelectItem value="received"><OptionRow option={fixed('received')} /></SelectItem>
+        <WorkOptionItem option={fixed('received', statusConfigs)} />
         <SelectGroup>
           <SelectLabel>In Progress</SelectLabel>
           {inProgress.map(o => (
-            <SelectItem key={o.value} value={o.value}><OptionRow option={o} /></SelectItem>
+            <WorkOptionItem key={o.value} option={o} />
           ))}
         </SelectGroup>
-        <SelectItem value="ready"><OptionRow option={fixed('ready')} /></SelectItem>
-        <SelectItem value="delivered"><OptionRow option={fixed('delivered')} /></SelectItem>
-        <SelectItem value="on_hold"><OptionRow option={fixed('on_hold')} /></SelectItem>
+        <WorkOptionItem option={fixed('ready', statusConfigs)} />
+        <WorkOptionItem option={fixed('delivered', statusConfigs)} />
+        <WorkOptionItem option={fixed('on_hold', statusConfigs)} />
       </SelectContent>
     </Select>
   )

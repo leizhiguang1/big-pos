@@ -1,5 +1,5 @@
 import type { WorkStage, WorkStatus } from './database.types'
-import { WORK_STATUS_LABELS, WORK_STATUS_COLORS } from './work-status'
+import { workStatusColor, workStatusLabel, type WorkStatusDisplay } from './work-status-config'
 
 // Pill color used when a stage has no color set (mirrors service-status DEFAULT_COLOR).
 export const STAGE_DEFAULT_COLOR = 'bg-gray-100 text-gray-700'
@@ -40,42 +40,52 @@ export function decodeWork(value: string): { work_status: WorkStatus; stage_id: 
 }
 
 // Display label for a current (work_status, stage_id).
-export function workLabel(work_status: WorkStatus, stage_id: string | null, stagesById: Map<string, WorkStage>): string {
+export function workLabel(
+  work_status: WorkStatus,
+  stage_id: string | null,
+  stagesById: Map<string, WorkStage>,
+  statusConfigs?: WorkStatusDisplay[],
+): string {
   if (work_status === 'in_progress' && stage_id) {
     const s = stagesById.get(stage_id)
     if (s) return s.label
   }
-  return WORK_STATUS_LABELS[work_status]
+  return workStatusLabel(work_status, statusConfigs)
 }
 
 // Pill color classes for a current (work_status, stage_id).
-export function workColor(work_status: WorkStatus, stage_id: string | null, stagesById: Map<string, WorkStage>): string {
+export function workColor(
+  work_status: WorkStatus,
+  stage_id: string | null,
+  stagesById: Map<string, WorkStage>,
+  statusConfigs?: WorkStatusDisplay[],
+): string {
   if (work_status === 'in_progress' && stage_id) {
     const s = stagesById.get(stage_id)
     if (s) return s.color ?? STAGE_DEFAULT_COLOR
   }
-  return WORK_STATUS_COLORS[work_status]
+  return workStatusColor(work_status, statusConfigs)
 }
 
 // Same as workLabel/workColor but keyed by an encoded group/option value.
-export function labelForValue(value: string, stagesById: Map<string, WorkStage>): string {
+export function labelForValue(value: string, stagesById: Map<string, WorkStage>, statusConfigs?: WorkStatusDisplay[]): string {
   const { work_status, stage_id } = decodeWork(value)
-  return workLabel(work_status, stage_id, stagesById)
+  return workLabel(work_status, stage_id, stagesById, statusConfigs)
 }
-export function colorForValue(value: string, stagesById: Map<string, WorkStage>): string {
+export function colorForValue(value: string, stagesById: Map<string, WorkStage>, statusConfigs?: WorkStatusDisplay[]): string {
   const { work_status, stage_id } = decodeWork(value)
-  return workColor(work_status, stage_id, stagesById)
+  return workColor(work_status, stage_id, stagesById, statusConfigs)
 }
 
 // Canonical ordered options (also the canonical group order):
 // Received, each active stage (in order), Ready, Delivered, On Hold.
-export function workOptions(activeStages: WorkStage[]): WorkOption[] {
+export function workOptions(activeStages: WorkStage[], statusConfigs?: WorkStatusDisplay[]): WorkOption[] {
   return [
-    { value: 'received', label: WORK_STATUS_LABELS.received, color: WORK_STATUS_COLORS.received },
+    { value: 'received', label: workStatusLabel('received', statusConfigs), color: workStatusColor('received', statusConfigs) },
     ...activeStages.map(s => ({ value: `stage:${s.id}`, label: s.label, color: s.color ?? STAGE_DEFAULT_COLOR })),
-    { value: 'ready', label: WORK_STATUS_LABELS.ready, color: WORK_STATUS_COLORS.ready },
-    { value: 'delivered', label: WORK_STATUS_LABELS.delivered, color: WORK_STATUS_COLORS.delivered },
-    { value: 'on_hold', label: WORK_STATUS_LABELS.on_hold, color: WORK_STATUS_COLORS.on_hold },
+    { value: 'ready', label: workStatusLabel('ready', statusConfigs), color: workStatusColor('ready', statusConfigs) },
+    { value: 'delivered', label: workStatusLabel('delivered', statusConfigs), color: workStatusColor('delivered', statusConfigs) },
+    { value: 'on_hold', label: workStatusLabel('on_hold', statusConfigs), color: workStatusColor('on_hold', statusConfigs) },
   ]
 }
 
@@ -88,14 +98,15 @@ export function workOptionsForItem(
   work_status: WorkStatus,
   stage_id: string | null,
   stagesById: Map<string, WorkStage>,
+  statusConfigs?: WorkStatusDisplay[],
 ): WorkOption[] {
-  const base = workOptions(activeStages)
+  const base = workOptions(activeStages, statusConfigs)
   const current = encodeWork(work_status, stage_id)
   if (base.some(o => o.value === current)) return base
   const extra: WorkOption = {
     value: current,
-    label: workLabel(work_status, stage_id, stagesById),
-    color: workColor(work_status, stage_id, stagesById),
+    label: workLabel(work_status, stage_id, stagesById, statusConfigs),
+    color: workColor(work_status, stage_id, stagesById, statusConfigs),
   }
   const insertAt = base.findIndex(o => o.value === 'received') + 1
   return [...base.slice(0, insertAt), extra, ...base.slice(insertAt)]

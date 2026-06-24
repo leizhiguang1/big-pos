@@ -23,7 +23,8 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/feedback/toast'
 import { cn } from '@/lib/utils'
 import { todayISODate } from '@/lib/utils'
-import { WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_COLORS } from '@/lib/work-status'
+import { WORK_STATUSES } from '@/lib/work-status'
+import { workStatusColor, workStatusLabel, type WorkStatusDisplay } from '@/lib/work-status-config'
 import { updateWorkStatusAction } from '@/data/invoice-actions'
 import type { WorkStatus } from '@/lib/database.types'
 import type { WorkQueueRow } from '@/data/work'
@@ -98,6 +99,7 @@ function KanbanColumn({
   onDragStart,
   onDrop,
   onCardClick,
+  statusConfigs,
 }: {
   status: WorkStatus
   rows: WorkQueueRow[]
@@ -105,6 +107,7 @@ function KanbanColumn({
   onDragStart: (e: React.DragEvent, itemId: string) => void
   onDrop: (e: React.DragEvent, targetStatus: WorkStatus) => void
   onCardClick: (invoiceId: string | undefined) => void
+  statusConfigs: WorkStatusDisplay[]
 }) {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -124,9 +127,9 @@ function KanbanColumn({
       )}>
         <span className={cn(
           'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',
-          WORK_STATUS_COLORS[status],
+          workStatusColor(status, statusConfigs),
         )}>
-          {WORK_STATUS_LABELS[status]}
+          {workStatusLabel(status, statusConfigs)}
         </span>
         <span className="text-xs text-muted-foreground ml-auto">{rows.length}</span>
       </div>
@@ -159,7 +162,7 @@ function KanbanColumn({
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export function KanbanBoard({ rows }: { rows: WorkQueueRow[] }) {
+export function KanbanBoard({ rows, statusConfigs }: { rows: WorkQueueRow[]; statusConfigs: WorkStatusDisplay[] }) {
   const router = useRouter()
   const { show } = useToast()
   const [, startTransition] = useTransition()
@@ -222,6 +225,7 @@ export function KanbanBoard({ rows }: { rows: WorkQueueRow[] }) {
             onDragStart={handleDragStart}
             onDrop={handleDrop}
             onCardClick={handleCardClick}
+            statusConfigs={statusConfigs}
           />
         ))}
       </div>

@@ -22,8 +22,6 @@ import { listViewState } from '@/lib/list-view-state'
 import { statusBadgeVariant } from '@/lib/status-badge'
 import { FileText, Plus, Search } from 'lucide-react'
 import { cn, formatCurrency, formatDate, todayISODate } from '@/lib/utils'
-import { dominantWorkStatus } from '@/lib/work-status'
-import { WorkStatusBadge } from '@/components/work-status-badge'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
 import { useListUrlState, type ListUrlState } from '@/lib/use-list-url-state'
 import type { InvoiceListRow, InvoiceListPage, InvoiceView } from '@/data/invoices'
@@ -33,8 +31,6 @@ const VIEWS: { key: InvoiceView; label: string }[] = [
   { key: 'drafts', label: 'Drafts' },
   { key: 'unpaid', label: 'Awaiting payment' },
   { key: 'overdue', label: 'Overdue' },
-  { key: 'in_production', label: 'In production' },
-  { key: 'ready', label: 'Ready to deliver' },
   { key: 'voided', label: 'Voided' },
 ]
 
@@ -72,14 +68,6 @@ export function InvoiceListClient({
         ) : (
           <Badge variant={statusBadgeVariant('payment', inv.status)} className="capitalize">{inv.status}</Badge>
         ),
-    },
-    {
-      key: 'work',
-      header: 'Work',
-      cell: inv => {
-        const dominant = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
-        return dominant ? <WorkStatusBadge status={dominant} /> : <span className="text-xs text-muted-foreground">—</span>
-      },
     },
   ]
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { WorkStage } from '@/lib/database.types'
+import type { WorkStatusDisplay } from '@/lib/work-status-config'
 import {
   WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_COLORS,
   nextWorkStatus, hold, resume,
@@ -22,6 +23,10 @@ const tray  = stage('s1', 'Custom Tray', 10, 'bg-blue-100 text-blue-700')
 const tryin = stage('s2', 'Try-in',      20, 'bg-amber-100 text-amber-700')
 const active = [tray, tryin]
 const byId   = new Map(active.map(s => [s.id, s]))
+const statusConfigs: WorkStatusDisplay[] = [
+  { status: 'received', label: 'New Case', color: 'bg-cyan-100 text-cyan-700', sort_order: 10 },
+  { status: 'ready', label: 'Ready for Pickup', color: 'bg-emerald-100 text-emerald-700', sort_order: 30 },
+]
 
 // ---------------------------------------------------------------------------
 // WORK_STATUSES — ported from work-status.test.ts
@@ -109,6 +114,14 @@ describe('workOptions', () => {
     const noColor = [stage('s3', 'Bake', 30, null)]
     expect(workOptions(noColor)[1]).toEqual({ value: 'stage:s3', label: 'Bake', color: STAGE_DEFAULT_COLOR })
   })
+  it('keeps the same option order while using configured status display', () => {
+    const opts = workOptions(active, statusConfigs)
+    expect(opts.map(o => o.value)).toEqual([
+      'received', 'stage:s1', 'stage:s2', 'ready', 'delivered', 'on_hold',
+    ])
+    expect(opts[0]).toEqual({ value: 'received', label: 'New Case', color: 'bg-cyan-100 text-cyan-700' })
+    expect(opts[3]).toEqual({ value: 'ready', label: 'Ready for Pickup', color: 'bg-emerald-100 text-emerald-700' })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -147,6 +160,10 @@ describe('workLabel / workColor', () => {
   it('falls back to the phase label+color for non-stage statuses', () => {
     expect(workLabel('ready', null, byId)).toBe(WORK_STATUS_LABELS.ready)
     expect(workColor('ready', null, byId)).toBe(WORK_STATUS_COLORS.ready)
+  })
+  it('uses configured phase labels and colors when provided', () => {
+    expect(workLabel('ready', null, byId, statusConfigs)).toBe('Ready for Pickup')
+    expect(workColor('ready', null, byId, statusConfigs)).toBe('bg-emerald-100 text-emerald-700')
   })
   it('falls back to In Progress when the stage is unknown or missing', () => {
     expect(workLabel('in_progress', 'gone', byId)).toBe(WORK_STATUS_LABELS.in_progress)

@@ -17,12 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { cn, formatCurrency, formatDate, todayISODate } from '@/lib/utils'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
 import { statusBadgeVariant } from '@/lib/status-badge'
-import { dominantWorkStatus } from '@/lib/work-status'
-import { WorkStatusBadge } from '@/components/work-status-badge'
 import { DEFAULT_COLOR } from '@/lib/service-status'
 import { InvoiceDetailClient } from '@/components/invoices/detail/InvoiceDetailClient'
 import { CaseDetailsEditor } from '@/components/invoices/detail/CaseDetailsEditor'
-import { ServiceStatusSelector } from '@/components/invoices/detail/ServiceStatusSelector'
 import { WorkStatusEditor } from '@/components/invoices/detail/WorkStatusEditor'
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -30,7 +27,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const data = await getInvoiceDetail(id)
   if (!data) notFound()
 
-  const { invoice, items, payments, history, products, stages, serviceStatuses } = data
+  const { invoice, items, payments, history, products, stages, workStatusConfigs, serviceStatuses } = data
   const customer = invoice.customers ?? null
 
   // Money model — computed server-side, mirroring the original page exactly.
@@ -50,8 +47,6 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const voided = isVoided(invoice)
   const today = todayISODate()
   const overdue = !voided && isOverdue(invoice, today)
-  // One representative production status across the case's line items.
-  const dominantWork = dominantWorkStatus(items.map(it => it.work_status))
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -65,12 +60,14 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         serviceStatuses={serviceStatuses}
         currentServiceStatus={currentServiceStatus}
         stages={stages}
+        workStatusConfigs={workStatusConfigs}
         customerName={customer?.clinic_name ?? null}
         totalPaid={totalPaid}
         unrecorded={unrecorded}
-        dominantWork={dominantWork}
       >
-        {/* Unified case-status strip — payment · work · service + money, at a glance */}
+        {/* Case-status strip — payment · service + money, at a glance. Work status is
+            tracked per service item (see the Work Status editor below), never rolled
+            up to the invoice. */}
         <Card className="print:hidden">
           <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-3 py-4">
             <div className="space-y-1">
@@ -82,10 +79,6 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               ) : (
                 <Badge variant={statusBadgeVariant('payment', invoice.status)} className="capitalize">{invoice.status}</Badge>
               )}
-            </div>
-            <div className="space-y-1">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Work</p>
-              {dominantWork ? <WorkStatusBadge status={dominantWork} /> : <span className="text-sm text-muted-foreground">—</span>}
             </div>
             <div className="space-y-1">
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Service</p>
@@ -115,15 +108,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         </Card>
 
         {/* Daily work — above the printable document */}
-        {!voided && items.length > 0 && <WorkStatusEditor items={items} history={history} stages={stages} />}
-        {!voided && (
-          <ServiceStatusSelector
-            invoiceId={invoice.id}
-            serviceStatusId={invoice.service_status_id}
-            serviceStatuses={serviceStatuses}
-          />
-        )}
-        {!voided && <CaseDetailsEditor invoice={invoice} />}
+        {!voided && items.length > 0 && <WorkStatusEditor items={items} history={history} stages={stages} statusConfigs={workStatusConfigs} />}
+        {!voided && <CaseDetailsEditor invoice={invoice} serviceStatusId={invoice.service_status_id} serviceStatuses={serviceStatuses} />}
       </InvoiceDetailClient>
 
       {/* Internal remarks — staff-only, never printed. Stored in invoices.notes. */}

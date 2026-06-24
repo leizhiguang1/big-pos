@@ -19,10 +19,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { WorkStatusSelect } from '@/components/work-status-select'
 import { Search, ChevronRight, ChevronDown, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { WorkStatus, WorkStage } from '@/lib/database.types'
-import {
-  WORK_STATUSES, WORK_STATUS_LABELS, WORK_STATUS_FILLED, WORK_STATUS_OUTLINED,
-} from '@/lib/work-status'
+import type { WorkStatus, WorkStage, WorkStatusConfig } from '@/lib/database.types'
+import { WORK_STATUSES } from '@/lib/work-status'
+import { workStatusColor, workStatusLabel, type WorkStatusDisplay } from '@/lib/work-status-config'
 import {
   encodeWork, decodeWork,
   labelForValue, colorForValue, orderedGroupKeys,
@@ -36,6 +35,16 @@ type FilterMode = 'active' | 'all' | WorkStatus
 // Encoded value sentinel for the "Resume" option offered on on_hold rows. It is
 // never persisted — selecting it routes to `resume(resume_status)` instead.
 const RESUME_VALUE = '__resume__'
+
+const resumeLeadingItem = (resumeStatus: WorkStatus | null, statusConfigs: WorkStatusDisplay[]) => {
+  const status = resume(resumeStatus)
+  return [{
+    value: RESUME_VALUE,
+    label: 'Resume',
+    colorLabel: workStatusLabel(status, statusConfigs),
+    color: workStatusColor(status, statusConfigs),
+  }]
+}
 
 // Outlined/filled palettes for the meta chips so they follow the same
 // "color = stage" rule as the per-status chips.
@@ -68,18 +77,19 @@ function relativeTime(iso: string, now: number | null): string {
 }
 
 // A small pill used for group headers and the "moved to" hint, colored by slot.
-function SlotBadge({ value, stagesById, className }: {
+function SlotBadge({ value, stagesById, statusConfigs, className }: {
   value: string
   stagesById: Map<string, WorkStage>
+  statusConfigs: WorkStatusDisplay[]
   className?: string
 }) {
   return (
     <span className={cn(
       'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap',
-      colorForValue(value, stagesById),
+      colorForValue(value, stagesById, statusConfigs),
       className,
     )}>
-      {labelForValue(value, stagesById)}
+      {labelForValue(value, stagesById, statusConfigs)}
     </span>
   )
 }
@@ -92,7 +102,17 @@ type OptimisticMove = {
   stage_id: string | null
 }
 
-export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueRow[]; stages: WorkStage[]; hideHeader?: boolean }) {
+export function WorkQueueClient({
+  rows,
+  stages,
+  statusConfigs,
+  hideHeader,
+}: {
+  rows: WorkQueueRow[]
+  stages: WorkStage[]
+  statusConfigs: WorkStatusConfig[]
+  hideHeader?: boolean
+}) {
   const router = useRouter()
   const { show } = useToast()
   const [, startTransition] = useTransition()
@@ -234,7 +254,7 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
   const chips: Array<{ key: FilterMode; label: string; count: number }> = [
     { key: 'active', label: 'Active', count: activeCount },
     { key: 'all', label: 'All', count: optimisticRows.length },
-    ...WORK_STATUSES.map(s => ({ key: s as FilterMode, label: WORK_STATUS_LABELS[s], count: counts[s] })),
+    ...WORK_STATUSES.map(s => ({ key: s as FilterMode, label: workStatusLabel(s, statusConfigs), count: counts[s] })),
   ]
 
   return (
@@ -252,8 +272,8 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
         {chips.map(c => {
           const stageKey = c.key !== 'active' && c.key !== 'all' ? (c.key as WorkStatus) : null
           const isSelected = filter === c.key
-          const filled = stageKey ? WORK_STATUS_FILLED[stageKey] : META_CHIP_FILLED[c.key as 'active' | 'all']
-          const outlined = stageKey ? WORK_STATUS_OUTLINED[stageKey] : META_CHIP_OUTLINED[c.key as 'active' | 'all']
+          const filled = stageKey ? cn(workStatusColor(stageKey, statusConfigs), 'ring-1 ring-inset ring-current') : META_CHIP_FILLED[c.key as 'active' | 'all']
+          const outlined = stageKey ? cn(workStatusColor(stageKey, statusConfigs), 'opacity-75 hover:opacity-100') : META_CHIP_OUTLINED[c.key as 'active' | 'all']
           return (
             <button
               key={c.key}
@@ -301,7 +321,7 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
               >
                 <div className="flex items-center gap-3">
                   {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                  <SlotBadge value={group.key} stagesById={allStagesById} />
+                  <SlotBadge value={group.key} stagesById={allStagesById} statusConfigs={statusConfigs} />
                   <span className="text-sm text-muted-foreground">{group.items.length} item{group.items.length === 1 ? '' : 's'}</span>
                 </div>
               </button>
@@ -338,7 +358,7 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
                           <div className="text-sm text-foreground truncate">{row.description}</div>
                           {isMoved ? (
                             <div className="text-xs text-green-700 mt-0.5 flex items-center gap-1">
-                              <Check className="h-3 w-3" /> Moved to <SlotBadge value={movedTo!} stagesById={allStagesById} className="ml-0.5" />
+                              <Check className="h-3 w-3" /> Moved to <SlotBadge value={movedTo!} stagesById={allStagesById} statusConfigs={statusConfigs} className="ml-0.5" />
                             </div>
                           ) : (
                             <div className="text-xs text-muted-foreground mt-0.5">{relativeTime(row.work_status_updated_at, clientNow)}</div>
@@ -352,10 +372,11 @@ export function WorkQueueClient({ rows, stages, hideHeader }: { rows: WorkQueueR
                           workStatus={row.work_status}
                           stageId={row.stage_id}
                           stagesById={allStagesById}
+                          statusConfigs={statusConfigs}
                           triggerClassName="w-40"
                           leadingItems={
                             row.work_status === 'on_hold'
-                              ? [{ value: RESUME_VALUE, label: `Resume (${WORK_STATUS_LABELS[resume(row.resume_status)]})` }]
+                              ? resumeLeadingItem(row.resume_status, statusConfigs)
                               : undefined
                           }
                         />

@@ -275,57 +275,6 @@ export async function updateWorkNoteAction(
   return { ok: true }
 }
 
-// Advance ALL items of an invoice to a single work status (Kanban drag-to-column).
-// Mirrors updateWorkStatusAction's permission gate, on_hold round-trip logic, and
-// revalidation. The DB trigger handles history logging + work_status_updated_at
-// stamps for each row just as it does for single-item updates.
-export async function updateCaseWorkStatusAction(
-  invoiceId: string,
-  workStatus: WorkStatus,
-): Promise<ActionResult> {
-  const gate = await requirePermission('invoices.view')
-  if (!gate.ok) return gate
-
-  // Use the SSR (session) client so the DB trigger records the acting user in history.
-  const supabase = await createClient()
-
-  // Fetch all items for this invoice to compute per-item resume_status.
-  const { data: items, error: readErr } = await supabase
-    .from('invoice_items')
-    .select('id, work_status, resume_status')
-    .eq('invoice_id', invoiceId)
-  if (readErr || !items) return { ok: false, error: readErr?.message ?? 'Invoice items not found' }
-  if (items.length === 0) return { ok: false, error: 'No items found for this invoice' }
-
-  // For each item, compute resume_status with the same on_hold round-trip logic as
-  // updateWorkStatusAction: entering on_hold remembers the previous status; leaving
-  // on_hold clears it; re-selecting on_hold while already on_hold preserves memory.
-  const updates = items.map(item => {
-    const resume_status: WorkStatus | null =
-      workStatus === 'on_hold'
-        ? item.work_status === 'on_hold'
-          ? (item.resume_status as WorkStatus | null)
-          : hold(item.work_status as WorkStatus).resumeFrom
-        : null
-    return { id: item.id, resume_status }
-  })
-
-  // Update all items sequentially — each triggers the DB history trigger.
-  // We use individual updates (not a single .in()) because resume_status differs
-  // per item. The number of items per invoice is small (typically < 20).
-  for (const { id, resume_status } of updates) {
-    const { error } = await supabase
-      .from('invoice_items')
-      .update({ work_status: workStatus, stage_id: null, resume_status })
-      .eq('id', id)
-    if (error) return { ok: false, error: error.message }
-  }
-
-  revalidateInvoice(invoiceId)
-  revalidatePath('/work')
-  return { ok: true }
-}
-
 export async function updateCaseDetailsAction(
   id: string,
   input: { patient: string | null; doctor: string | null },

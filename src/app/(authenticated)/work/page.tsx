@@ -7,6 +7,6 @@ import { getWorkQueue } from '@/data/work'
 import { WorkViewToggle } from '@/components/work/WorkViewToggle'
 
 export default async function WorkPage() {
-  const { rows, stages } = await getWorkQueue()
-  return <WorkViewToggle rows={rows} stages={stages} />
+  const { rows, stages, statusConfigs } = await getWorkQueue()
+  return <WorkViewToggle rows={rows} stages={stages} statusConfigs={statusConfigs} />
 }

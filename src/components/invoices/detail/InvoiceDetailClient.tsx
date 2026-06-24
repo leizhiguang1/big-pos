@@ -12,7 +12,7 @@ import { canEditInvoice } from '@/lib/invoice-permissions'
 import { isVoided } from '@/lib/invoice-status'
 import { ActionsBar } from './ActionsBar'
 import { InvoiceDocument } from './InvoiceDocument'
-import type { InvoiceItem, Product, ServiceStatus, WorkStage, WorkStatus } from '@/lib/database.types'
+import type { InvoiceItem, Product, ServiceStatus, WorkStage, WorkStatusConfig } from '@/lib/database.types'
 import type { InvoiceDetail } from '@/data/invoices'
 
 type PrintMode = 'invoice' | 'delivery' | 'work_ticket'
@@ -25,11 +25,10 @@ export type InvoiceDetailClientProps = {
   currentServiceStatus: ServiceStatus | null
   /** Work stages — used to label per-item production status on the bench work ticket. */
   stages: WorkStage[]
+  workStatusConfigs: WorkStatusConfig[]
   customerName: string | null
   totalPaid: number
   unrecorded: number
-  /** Rolled-up (dominant) work status, for the Advance-work-status action. */
-  dominantWork: WorkStatus | null
   /** Editors + status strip, rendered between the actions bar and the printable document. */
   children?: ReactNode
 }
@@ -41,10 +40,10 @@ export function InvoiceDetailClient({
   serviceStatuses,
   currentServiceStatus,
   stages,
+  workStatusConfigs,
   customerName,
   totalPaid,
   unrecorded,
-  dominantWork,
   children,
 }: InvoiceDetailClientProps) {
   const { hasPermission } = useAuth()
@@ -58,7 +57,6 @@ export function InvoiceDetailClient({
         invoice={invoice}
         customerName={customerName}
         unrecorded={unrecorded}
-        dominantWork={dominantWork}
         onPrint={mode => printOpenRef.current(mode)}
       />
       {children}
@@ -69,6 +67,7 @@ export function InvoiceDetailClient({
         serviceStatuses={serviceStatuses}
         currentServiceStatus={currentServiceStatus}
         stages={stages}
+        workStatusConfigs={workStatusConfigs}
         totalPaid={totalPaid}
         canEdit={canEdit}
         onPrintReady={open => { printOpenRef.current = open }}

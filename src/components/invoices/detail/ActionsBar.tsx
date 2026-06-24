@@ -8,7 +8,7 @@
 // records the full outstanding balance and advances status — we never recompute
 // status client-side.
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
@@ -22,20 +22,17 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { formatCurrency, todayISODate } from '@/lib/utils'
-import { ArrowLeft, Printer, CreditCard, Ban, Pencil, Lock, ArrowRight } from 'lucide-react'
+import { cn, formatCurrency, todayISODate } from '@/lib/utils'
+import { ArrowLeft, Printer, CreditCard, Ban, Pencil, Lock, ChevronDown, FileText, Truck } from 'lucide-react'
 import { canEditInvoice } from '@/lib/invoice-permissions'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
 import { statusBadgeVariant } from '@/lib/status-badge'
-import { nextWorkStatus, WORK_STATUS_LABELS } from '@/lib/work-status'
 import {
   markSentAction,
   recordPaymentAction,
-  updateCaseWorkStatusAction,
 } from '@/data/invoice-actions'
 import { voidInvoice as voidInvoiceAction, restoreInvoice } from '@/lib/invoices/void-actions'
 import type { InvoiceDetail } from '@/data/invoices'
-import type { WorkStatus } from '@/lib/database.types'
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1),
@@ -51,13 +48,93 @@ export type ActionsBarProps = {
   customerName: string | null
   /** max(0, total - totalPaid) — the full balance recorded by Record Payment. */
   unrecorded: number
-  /** Rolled-up (dominant/least-finished) work status across the case's items. */
-  dominantWork: WorkStatus | null
   /** Opens the print dialog owned by the document island. */
   onPrint: (mode: PrintMode) => void
 }
 
-export function ActionsBar({ invoice, customerName, unrecorded, dominantWork, onPrint }: ActionsBarProps) {
+// Single "Print" entry point that reveals the printable documents (Invoice and
+// Delivery Note) on hover or click — keeping print apart from the workflow
+// actions. Work Ticket prints are still wired through `onPrint` in the document
+// island but are no longer surfaced here. Hover opens with a small close delay
+// so moving the cursor from the button onto the panel doesn't dismiss it;
+// click toggles it for touch/keyboard, with outside-click and Escape to close.
+function PrintMenu({ onPrint, className }: { onPrint: (mode: PrintMode) => void; className?: string }) {
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const openNow = () => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
+    setOpen(true)
+  }
+  const closeSoon = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => setOpen(false), 140)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  // Clean up the pending close timer on unmount.
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current) }, [])
+
+  const choose = (mode: PrintMode) => { setOpen(false); onPrint(mode) }
+
+  const items: { mode: PrintMode; label: string; description: string; icon: typeof FileText }[] = [
+    { mode: 'invoice', label: 'Invoice', description: 'Prices, totals & bank details', icon: FileText },
+    { mode: 'delivery', label: 'Delivery Note', description: 'Items & quantities, no prices', icon: Truck },
+  ]
+
+  return (
+    <div ref={containerRef} className={cn('relative', className)} onMouseEnter={openNow} onMouseLeave={closeSoon}>
+      <Button
+        variant="outline"
+        size="sm"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        <Printer className="h-4 w-4 mr-2" />Print
+        <ChevronDown className={cn('h-4 w-4 ml-1.5 opacity-60 transition-transform', open && 'rotate-180')} />
+      </Button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-1 min-w-[14rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {items.map(({ mode, label, description, icon: Icon }) => (
+            <button
+              key={mode}
+              type="button"
+              role="menuitem"
+              onClick={() => choose(mode)}
+              className="flex w-full items-start gap-2.5 rounded-sm px-2 py-2 text-left outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+            >
+              <Icon className="mt-0.5 h-4 w-4 shrink-0 opacity-70" />
+              <span className="flex flex-col">
+                <span className="text-sm font-medium leading-none">{label}</span>
+                <span className="mt-1 text-xs text-muted-foreground">{description}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ActionsBar({ invoice, customerName, unrecorded, onPrint }: ActionsBarProps) {
   const router = useRouter()
   const { hasPermission } = useAuth()
   const { show } = useToast()
@@ -68,7 +145,6 @@ export function ActionsBar({ invoice, customerName, unrecorded, dominantWork, on
   const [voiding, setVoiding] = useState(false)
   const [voidReason, setVoidReason] = useState('')
   const [restoring, setRestoring] = useState(false)
-  const [advancing, setAdvancing] = useState(false)
 
   const { register, handleSubmit, reset } = useForm<PaymentForm>({
     // Cast keeps RHF's Resolver generics aligned with the zod schema's inferred type.
@@ -107,22 +183,6 @@ export function ActionsBar({ invoice, customerName, unrecorded, dominantWork, on
     router.refresh()
   }
 
-  // One-click advance of the whole case to the next stage of the rolled-up work
-  // status (received → in_progress → ready → delivered). `nextWorkStatus`
-  // returns null when the dominant status is delivered or on_hold (off the
-  // linear flow), so the button is hidden in those cases. Writes every item to
-  // the new status via the same action the Kanban drag uses.
-  const advanceTarget = dominantWork ? nextWorkStatus(dominantWork) : null
-  const advanceWorkStatus = async () => {
-    if (!advanceTarget) return
-    setAdvancing(true)
-    const res = await updateCaseWorkStatusAction(invoice.id, advanceTarget)
-    setAdvancing(false)
-    if (res.ok === false) { show({ variant: 'error', title: res.error }); return }
-    show({ variant: 'success', title: `Work advanced to ${WORK_STATUS_LABELS[advanceTarget]}` })
-    router.refresh()
-  }
-
   const voidInvoice = async () => {
     setVoiding(true)
     try {
@@ -132,8 +192,11 @@ export function ActionsBar({ invoice, customerName, unrecorded, dominantWork, on
       setVoidReason('')
       show({ variant: 'success', title: 'Invoice voided' })
       router.refresh()
-    } catch (err) {
-      show({ variant: 'error', title: err instanceof Error ? err.message : 'Could not void the invoice. Please try again.' })
+    } catch {
+      // The action returns a friendly message via `res.error`; this only fires
+      // on an unexpected client/transport failure. Keep it generic — never
+      // surface a raw (masked) server error string to the user.
+      show({ variant: 'error', title: 'Could not void the invoice. Please try again.' })
     } finally {
       setVoiding(false)
     }
@@ -146,8 +209,8 @@ export function ActionsBar({ invoice, customerName, unrecorded, dominantWork, on
       if (res.ok === false) { show({ variant: 'error', title: res.error }); return }
       show({ variant: 'success', title: 'Invoice restored' })
       router.refresh()
-    } catch (err) {
-      show({ variant: 'error', title: err instanceof Error ? err.message : 'Could not restore the invoice. Please try again.' })
+    } catch {
+      show({ variant: 'error', title: 'Could not restore the invoice. Please try again.' })
     } finally {
       setRestoring(false)
     }
@@ -182,18 +245,9 @@ export function ActionsBar({ invoice, customerName, unrecorded, dominantWork, on
           </Link>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {!voided && invoice.status === 'draft' && (
           <Button variant="outline" size="sm" onClick={markAsSent}>Mark as Sent</Button>
-        )}
-        {/* One-click advance of the case's rolled-up work status to the next
-            stage. Hidden when there's nothing to advance (no items, delivered,
-            or on-hold). */}
-        {!voided && advanceTarget && (
-          <Button variant="outline" size="sm" onClick={advanceWorkStatus} disabled={advancing}>
-            <ArrowRight className="h-4 w-4 mr-2" />
-            {advancing ? 'Advancing…' : `Advance to ${WORK_STATUS_LABELS[advanceTarget]}`}
-          </Button>
         )}
         {/* Record Payment is the single settle action: it records the full
             outstanding balance and marks the invoice paid. Hidden once paid so
@@ -210,17 +264,6 @@ export function ActionsBar({ invoice, customerName, unrecorded, dominantWork, on
             </Link>
           </Button>
         )}
-        <Button variant="outline" size="sm" onClick={() => onPrint('invoice')}>
-          <Printer className="h-4 w-4 mr-2" />Print Invoice
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => onPrint('delivery')}>
-          <Printer className="h-4 w-4 mr-2" />Print Delivery
-        </Button>
-        {/* Internal bench ticket — work status + notes, no prices. Prints directly
-            (no print-preview override editor; see InvoiceDocument). */}
-        <Button variant="outline" size="sm" onClick={() => onPrint('work_ticket')}>
-          <Printer className="h-4 w-4 mr-2" />Print Work Ticket
-        </Button>
         {hasPermission('invoices.manage') && !voided && (
           <Button
             variant="outline"
@@ -236,6 +279,9 @@ export function ActionsBar({ invoice, customerName, unrecorded, dominantWork, on
             {restoring ? 'Restoring…' : 'Restore'}
           </Button>
         )}
+        {/* Print is kept apart from the workflow actions: a single entry point on
+            the right that reveals the printable documents on hover or click. */}
+        <PrintMenu onPrint={onPrint} className="ml-auto" />
       </div>
 
       {/* Void confirmation dialog */}

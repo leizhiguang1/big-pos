@@ -17,9 +17,8 @@ import type {
   Product,
   ServiceStatus,
   WorkStage,
-  WorkStatus,
+  WorkStatusConfig,
 } from '@/lib/database.types'
-import { dominantWorkStatus } from '@/lib/work-status'
 import { isVoided, isOverdue } from '@/lib/invoice-status'
 import { todayISODate } from '@/lib/utils'
 import { paginate } from '@/lib/pagination'
@@ -30,7 +29,6 @@ import { paginate } from '@/lib/pagination'
 // page's local `InvoiceWithItems` shape.
 export type InvoiceListRow = Invoice & {
   customers?: { clinic_name: string } | null
-  invoice_items?: Array<{ work_status: WorkStatus }>
   service_statuses?: ServiceStatus | null
 }
 
@@ -48,6 +46,7 @@ export type InvoiceDetailBundle = {
   history: InvoiceItemStatusHistory[]
   products: Product[]
   stages: WorkStage[]
+  workStatusConfigs: WorkStatusConfig[]
   serviceStatuses: ServiceStatus[]
 }
 
@@ -67,20 +66,20 @@ export type InvoiceForEdit = {
 // --- Queries ---------------------------------------------------------------
 
 // List query — mirrors `invoices/page.tsx`:
-//   .select('*, customers(clinic_name), invoice_items(work_status), service_statuses(*)')
+//   .select('*, customers(clinic_name), service_statuses(*)')
 //   .order('created_at', { ascending: false })
 export async function getInvoices(): Promise<InvoiceListRow[]> {
   const supabase = await createClient()
   const { data } = await supabase
     .from('invoices')
-    .select('*, customers(clinic_name), invoice_items(work_status), service_statuses(*)')
+    .select('*, customers(clinic_name), service_statuses(*)')
     .order('created_at', { ascending: false })
   return (data ?? []) as InvoiceListRow[]
 }
 
 // --- Paginated list (URL-driven) -------------------------------------------
 
-export type InvoiceView = 'all' | 'drafts' | 'unpaid' | 'overdue' | 'in_production' | 'ready' | 'voided'
+export type InvoiceView = 'all' | 'drafts' | 'unpaid' | 'overdue' | 'voided'
 
 export interface InvoiceListParams {
   q?: string
@@ -112,19 +111,14 @@ const INVOICE_SORTERS: Record<string, (r: InvoiceListRow) => string | number> = 
   amount: r => Number(r.total),
 }
 
-// Plain-status / voided views push cheaply into SQL; the derived views
-// (overdue / in_production / ready) depend on the item rollup + today, so they
-// run as a JS predicate over the fetched, cheap-filtered rows.
+// Plain-status / voided views push cheaply into SQL; `overdue` depends on
+// today, so it runs as a JS predicate over the fetched, cheap-filtered rows.
+// Work status is tracked per service item, never rolled up to the invoice, so
+// there are no work-based invoice views.
 function matchesDerivedView(inv: InvoiceListRow, view: InvoiceView, today: string): boolean {
   switch (view) {
     case 'overdue':
       return isOverdue(inv, today)
-    case 'in_production': {
-      const d = dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status))
-      return !isVoided(inv) && d != null && d !== 'ready' && d !== 'delivered'
-    }
-    case 'ready':
-      return dominantWorkStatus((inv.invoice_items ?? []).map(it => it.work_status)) === 'ready'
     default:
       return true
   }
@@ -143,7 +137,7 @@ export async function getInvoicesPage(params: InvoiceListParams = {}): Promise<I
 
   let query = supabase
     .from('invoices')
-    .select('*, customers(clinic_name), invoice_items(work_status), service_statuses(*)')
+    .select('*, customers(clinic_name), service_statuses(*)')
     .order('created_at', { ascending: false })
 
   // Cheap status/voided filters → SQL.
@@ -181,7 +175,7 @@ export async function getInvoicesPage(params: InvoiceListParams = {}): Promise<I
   }
 
   // Derived views → JS predicate.
-  if (view === 'overdue' || view === 'in_production' || view === 'ready') {
+  if (view === 'overdue') {
     rows = rows.filter(inv => matchesDerivedView(inv, view, today))
   }
 
@@ -218,15 +212,13 @@ export async function getInvoiceViewCounts(): Promise<Record<InvoiceView, number
   const today = todayISODate()
   const { data } = await supabase
     .from('invoices')
-    .select('*, customers(clinic_name), invoice_items(work_status), service_statuses(*)')
+    .select('*, customers(clinic_name), service_statuses(*)')
   const all = (data ?? []) as InvoiceListRow[]
   return {
     all: all.length,
     drafts: all.filter(i => !isVoided(i) && i.status === 'draft').length,
     unpaid: all.filter(i => !isVoided(i) && ['sent', 'partial', 'overdue'].includes(i.status)).length,
     overdue: all.filter(i => isOverdue(i, today)).length,
-    in_production: all.filter(i => matchesDerivedView(i, 'in_production', today)).length,
-    ready: all.filter(i => matchesDerivedView(i, 'ready', today)).length,
     voided: all.filter(i => isVoided(i)).length,
   }
 }
@@ -237,13 +229,17 @@ export async function getInvoiceViewCounts(): Promise<Record<InvoiceView, number
 export async function getInvoiceDetail(id: string): Promise<InvoiceDetailBundle | null> {
   const supabase = await createClient()
 
-  const [invRes, itemsRes, paymentsRes, ssRes, prodRes, stagesRes] = await Promise.all([
+  const [invRes, itemsRes, paymentsRes, ssRes, prodRes, stagesRes, statusConfigsRes] = await Promise.all([
     supabase.from('invoices').select('*, customers(*), service_statuses(*)').eq('id', id).single(),
-    supabase.from('invoice_items').select('*').eq('invoice_id', id).order('created_at'),
+    // sort_order preserves the order lines were entered and is stable across
+    // work-status updates (created_at alone ties → heap order, which an UPDATE
+    // relocates). created_at is a defensive tiebreaker for any pre-backfill rows.
+    supabase.from('invoice_items').select('*').eq('invoice_id', id).order('sort_order').order('created_at'),
     supabase.from('payments').select('*').eq('invoice_id', id).order('payment_date'),
     supabase.from('service_statuses').select('*').eq('is_active', true).order('sort_order').order('label'),
     supabase.from('products').select('*').eq('active', true).order('created_at'),
     supabase.from('work_stages').select('*').order('sort_order').order('label'),
+    supabase.from('work_status_configs').select('*').order('sort_order'),
   ])
 
   if (!invRes.data) return null
@@ -268,8 +264,18 @@ export async function getInvoiceDetail(id: string): Promise<InvoiceDetailBundle 
     history,
     products: (prodRes.data ?? []) as Product[],
     stages: (stagesRes.data ?? []) as WorkStage[],
+    workStatusConfigs: (statusConfigsRes.data ?? []) as WorkStatusConfig[],
     serviceStatuses: (ssRes.data ?? []) as ServiceStatus[],
   }
+}
+
+export async function getWorkStatusConfigs(): Promise<WorkStatusConfig[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('work_status_configs')
+    .select('*')
+    .order('sort_order')
+  return (data ?? []) as WorkStatusConfig[]
 }
 
 // Reference data for the form — mirrors `InvoiceForm.tsx`'s mount-time reads:
@@ -295,7 +301,8 @@ export async function getInvoiceForEdit(id: string): Promise<InvoiceForEdit | nu
   const supabase = await createClient()
   const [invRes, itemsRes] = await Promise.all([
     supabase.from('invoices').select('*').eq('id', id).single(),
-    supabase.from('invoice_items').select('*').eq('invoice_id', id).order('created_at'),
+    // Match getInvoiceDetail: keep the edit form's rows in entered order.
+    supabase.from('invoice_items').select('*').eq('invoice_id', id).order('sort_order').order('created_at'),
   ])
   if (!invRes.data) return null
   return {

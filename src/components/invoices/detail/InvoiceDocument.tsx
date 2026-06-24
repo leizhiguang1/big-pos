@@ -12,18 +12,20 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/feedback/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { ServiceStatusSelectItem } from '@/components/invoices/ServiceStatusSelectItem'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
-import { Printer, Pencil } from 'lucide-react'
+import { Printer, Pencil, Plus, Trash2 } from 'lucide-react'
 import { isVoided } from '@/lib/invoice-status'
 import { saveRecipientAction } from '@/data/invoice-actions'
-import type { InvoiceItem, Product, ServiceStatus, WorkStage } from '@/lib/database.types'
+import type { InvoiceItem, Product, ServiceStatus, WorkStage, WorkStatusConfig } from '@/lib/database.types'
 import type { InvoiceDetail } from '@/data/invoices'
-import { COMPANY, BANK } from '@/lib/config'
+import { COMPANY, BANK, INVOICE_NOTES, DEFAULT_PAYMENT_TERMS_DAYS } from '@/lib/config'
 import { DEFAULT_COLOR } from '@/lib/service-status'
 import { workLabel, workColor } from '@/lib/work-stages'
 
@@ -31,10 +33,16 @@ import { workLabel, workColor } from '@/lib/work-stages'
 // 'work_ticket' is internal and prints directly (no overrides — see openPrintDialog).
 type PrintMode = 'invoice' | 'delivery' | 'work_ticket'
 
-type ItemOverride = {
+// A single print line item. For an existing invoice item `id` is the DB row id
+// and `productId` lets the preview keep showing the product sub-description.
+// Lines added in the dialog get a synthetic `id` ('new-N') and no productId.
+// Editing these is print-only — nothing is saved back to the invoice.
+type PrintLineItem = {
+  id: string
   description: string
   quantity: number
   unitPrice: number
+  productId: string | null
 }
 
 type PrintOverrides = {
@@ -51,7 +59,7 @@ type PrintOverrides = {
   doctor: string
   serviceStatusId: string | null
   instructions: string
-  itemOverrides: Record<string, ItemOverride>
+  lineItems: PrintLineItem[]
 }
 
 export type InvoiceDocumentProps = {
@@ -62,6 +70,7 @@ export type InvoiceDocumentProps = {
   currentServiceStatus: ServiceStatus | null
   /** Work stages — used to label per-item production status on the work ticket. */
   stages: WorkStage[]
+  workStatusConfigs: WorkStatusConfig[]
   totalPaid: number
   /** Whether the recipient edit pencil is interactive (canEdit && !voided). */
   canEdit: boolean
@@ -76,6 +85,7 @@ export function InvoiceDocument({
   serviceStatuses,
   currentServiceStatus,
   stages,
+  workStatusConfigs,
   totalPaid,
   canEdit,
   onPrintReady,
@@ -83,6 +93,8 @@ export function InvoiceDocument({
   const router = useRouter()
   const { show } = useToast()
   const printRef = useRef<HTMLDivElement>(null)
+  // Monotonic counter for synthetic ids of line items added in the print dialog.
+  const newLineId = useRef(0)
   // Labels per-item work status on the work ticket (handles in-progress stages).
   const stagesById = new Map(stages.map(s => [s.id, s]))
 
@@ -131,11 +143,13 @@ export function InvoiceDocument({
       doctor: invoice.doctor ?? '',
       serviceStatusId: invoice.service_status_id,
       instructions: '',
-      itemOverrides: Object.fromEntries(items.map(it => [it.id, {
+      lineItems: items.map(it => ({
+        id: it.id,
         description: it.description,
         quantity: Number(it.quantity),
         unitPrice: Number(it.unit_price),
-      }])),
+        productId: it.product_id ?? null,
+      })),
     })
     setPrintDialogOpen(true)
   }
@@ -199,15 +213,31 @@ export function InvoiceDocument({
     router.refresh()
   }
 
+  // The product sub-description shown under a line in the printout.
+  const productDescriptionFor = (productId: string | null) =>
+    productId ? products.find(p => p.id === productId)?.description ?? null : null
+
   const resolveFields = (overrides: PrintOverrides | null) => {
     const o = overrides
-    const itemResolve = (it: InvoiceItem) => {
-      const ov = o?.itemOverrides[it.id]
-      const description = ov?.description ?? it.description
-      const quantity = ov ? ov.quantity : Number(it.quantity)
-      const unitPrice = ov ? ov.unitPrice : Number(it.unit_price)
-      return { description, quantity, unitPrice, amount: quantity * unitPrice }
-    }
+    // Normalized lines to render. With overrides we render the dialog's editable
+    // list (supports added/removed lines); otherwise the saved invoice items.
+    const lines = o
+      ? o.lineItems.map(li => ({
+          id: li.id,
+          description: li.description,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+          amount: li.quantity * li.unitPrice,
+          productDescription: productDescriptionFor(li.productId),
+        }))
+      : items.map(it => ({
+          id: it.id,
+          description: it.description,
+          quantity: Number(it.quantity),
+          unitPrice: Number(it.unit_price),
+          amount: Number(it.quantity) * Number(it.unit_price),
+          productDescription: productDescriptionFor(it.product_id ?? null),
+        }))
     // Subtotal = sum of (possibly overridden) line amounts. Apply the saved
     // invoice discount_pct to keep the printed Subtotal / Discount / Total
     // consistent when line items are overridden in the print dialog. With no
@@ -215,7 +245,7 @@ export function InvoiceDocument({
     const discountPct = Number(invoice.discount_pct ?? 0)
     const taxRate = Number(invoice.tax_rate ?? 0)
     const previewSubtotal = o
-      ? items.reduce((sum, it) => sum + itemResolve(it).amount, 0)
+      ? lines.reduce((sum, l) => sum + l.amount, 0)
       : Number(invoice.subtotal ?? invoice.total)
     const previewDiscount = o
       ? Math.round(previewSubtotal * discountPct) / 100
@@ -245,7 +275,7 @@ export function InvoiceDocument({
       serviceStatusForPrint: o
         ? (serviceStatuses.find(s => s.id === o.serviceStatusId) ?? null)
         : currentServiceStatus,
-      itemResolve,
+      lines,
       previewSubtotal,
       previewDiscount,
       previewDiscountPct: discountPct,
@@ -262,11 +292,17 @@ export function InvoiceDocument({
     showInlineEdit: boolean
   }) => {
     const { mode, resolved, showInlineEdit } = opts
-    const { field, serviceStatusForPrint, itemResolve, previewSubtotal, previewDiscount, previewDiscountPct, previewTax, previewTaxRate, previewTotal, instructions } = resolved
+    const { field, serviceStatusForPrint, lines, previewSubtotal, previewDiscount, previewDiscountPct, previewTax, previewTaxRate, previewTotal, instructions } = resolved
     // Subtotal breakdown prints when EITHER a discount or tax applies; an invoice
     // with neither keeps the original single Total row.
     const hasAdjustments = previewDiscount > 0 || previewTax > 0
     const isDelivery = mode === 'delivery'
+    // Payment terms = the gap between the invoice date and its (possibly
+    // overridden) due date, so the printed term always matches the dates on the
+    // same page. Falls back to the lab default when no due date is set.
+    const paymentTermsDays = field.dueDate
+      ? Math.max(0, Math.round((new Date(field.dueDate).getTime() - new Date(field.date).getTime()) / 86_400_000))
+      : DEFAULT_PAYMENT_TERMS_DAYS
     return (
       <>
         {isVoided(invoice) && (
@@ -326,9 +362,6 @@ export function InvoiceDocument({
               {field.billToContact && <div className="text-sm text-gray-600">{field.billToContact}</div>}
               {field.billingAddress && <div className="text-sm text-gray-500 whitespace-pre-line">{field.billingAddress}</div>}
               {field.billToPhone && <div className="text-sm text-gray-500">Tel: {field.billToPhone}</div>}
-              {/* Clinic TIN (Wave 4) — printed beside the clinic's registration
-                  identity when set on the customer master. */}
-              {invoice.customers?.tin && <div className="text-sm text-gray-500">TIN: {invoice.customers.tin}</div>}
             </div>
             {field.deliveryAddress && (
               <div>
@@ -381,29 +414,23 @@ export function InvoiceDocument({
             </tr>
           </thead>
           <tbody>
-            {items.map(item => {
-              const r = itemResolve(item)
-              const productDescription = item.product_id
-                ? products.find(p => p.id === item.product_id)?.description
-                : null
-              return (
-                <tr key={item.id} className="border-b border-gray-100">
-                  <td className="py-2.5">
-                    <div>{r.description}</div>
-                    {productDescription && (
-                      <div className="text-xs text-gray-400 mt-0.5">{productDescription}</div>
-                    )}
-                  </td>
-                  <td className="py-2.5 text-right text-gray-600">{r.quantity}</td>
-                  {!isDelivery && (
-                    <>
-                      <td className="py-2.5 text-right text-gray-600">{formatCurrency(r.unitPrice)}</td>
-                      <td className="py-2.5 text-right font-medium">{formatCurrency(r.amount)}</td>
-                    </>
+            {lines.map(line => (
+              <tr key={line.id} className="border-b border-gray-100">
+                <td className="py-2.5">
+                  <div>{line.description}</div>
+                  {line.productDescription && (
+                    <div className="text-xs text-gray-400 mt-0.5">{line.productDescription}</div>
                   )}
-                </tr>
-              )
-            })}
+                </td>
+                <td className="py-2.5 text-right text-gray-600">{line.quantity}</td>
+                {!isDelivery && (
+                  <>
+                    <td className="py-2.5 text-right text-gray-600">{formatCurrency(line.unitPrice)}</td>
+                    <td className="py-2.5 text-right font-medium">{formatCurrency(line.amount)}</td>
+                  </>
+                )}
+              </tr>
+            ))}
           </tbody>
           {!isDelivery && (
             <tfoot>
@@ -459,13 +486,27 @@ export function InvoiceDocument({
           <>
             <Separator className="mb-6" />
             <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
-              <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-3">Payment Details</div>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                <div><span className="text-gray-500">Bank: </span><span className="font-medium">{BANK.bankName}</span></div>
-                <div><span className="text-gray-500">Account Name: </span><span className="font-medium">{BANK.accountName}</span></div>
-                <div><span className="text-gray-500">Account No: </span><span className="font-medium font-mono">{BANK.accountNumber}</span></div>
+              <div className="grid grid-cols-2 gap-x-8">
+                {/* Left: bank / payment details */}
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-3">Payment Details</div>
+                  <div className="space-y-1 text-sm">
+                    <div><span className="text-gray-500">Bank: </span><span className="font-medium">{BANK.bankName}</span></div>
+                    <div><span className="text-gray-500">Account Name: </span><span className="font-medium">{BANK.accountName}</span></div>
+                    <div><span className="text-gray-500">Account No: </span><span className="font-medium font-mono">{BANK.accountNumber}</span></div>
+                  </div>
+                  <p className="text-xs text-primary/60 mt-3 italic">{BANK.paymentNote}</p>
+                </div>
+                {/* Right: payment terms + standing notes */}
+                <div className="text-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Payment Terms</div>
+                  <div className="font-medium text-gray-700 mb-3">{paymentTermsDays} Days</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Note</div>
+                  <ol className="list-decimal list-inside text-gray-700 space-y-0.5">
+                    {INVOICE_NOTES.map((note, i) => <li key={i}>{note}</li>)}
+                  </ol>
+                </div>
               </div>
-              <p className="text-xs text-primary/60 mt-3 italic">{BANK.paymentNote}</p>
             </div>
           </>
         )}
@@ -593,8 +634,8 @@ export function InvoiceDocument({
                   </td>
                   <td className="py-2.5 text-right text-gray-600">{Number(item.quantity)}</td>
                   <td className="py-2.5 pl-4">
-                    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', workColor(item.work_status, item.stage_id, stagesById))}>
-                      {workLabel(item.work_status, item.stage_id, stagesById)}
+                    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', workColor(item.work_status, item.stage_id, stagesById, workStatusConfigs))}>
+                      {workLabel(item.work_status, item.stage_id, stagesById, workStatusConfigs)}
                     </span>
                   </td>
                 </tr>
@@ -683,17 +724,20 @@ export function InvoiceDocument({
                   <fieldset className="border rounded-md p-3 space-y-2.5">
                     <legend className="text-xs font-semibold text-gray-500 px-1 uppercase tracking-wider">Bill To</legend>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-gray-500">Name</Label>
+                      <Label className="text-xs text-gray-500">Clinic</Label>
                       <Input value={printDraft.billToName} onChange={e => setPrintDraft(d => d && ({ ...d, billToName: e.target.value }))} />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-gray-500">Contact</Label>
+                        <Label className="text-xs text-gray-500">Contact person</Label>
                         <Input value={printDraft.billToContact} onChange={e => setPrintDraft(d => d && ({ ...d, billToContact: e.target.value }))} />
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs text-gray-500">Phone</Label>
-                        <Input value={printDraft.billToPhone} onChange={e => setPrintDraft(d => d && ({ ...d, billToPhone: e.target.value }))} />
+                        <PhoneInput
+                          value={printDraft.billToPhone}
+                          onChange={value => setPrintDraft(d => d && ({ ...d, billToPhone: value }))}
+                        />
                       </div>
                     </div>
                     <div className="space-y-1.5">
@@ -706,11 +750,11 @@ export function InvoiceDocument({
                     <legend className="text-xs font-semibold text-gray-500 px-1 uppercase tracking-wider">Deliver To</legend>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-gray-500">Name</Label>
+                        <Label className="text-xs text-gray-500">Clinic</Label>
                         <Input value={printDraft.shipToName} onChange={e => setPrintDraft(d => d && ({ ...d, shipToName: e.target.value }))} />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-gray-500">Contact</Label>
+                        <Label className="text-xs text-gray-500">Contact person</Label>
                         <Input value={printDraft.shipToContact} onChange={e => setPrintDraft(d => d && ({ ...d, shipToContact: e.target.value }))} />
                       </div>
                     </div>
@@ -742,76 +786,115 @@ export function InvoiceDocument({
                         <SelectContent>
                           <SelectItem value="__none__">No status</SelectItem>
                           {serviceStatuses.map(s => (
-                            <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                            <ServiceStatusSelectItem key={s.id} status={s} />
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                   </fieldset>
 
-                  {items.length > 0 && (
-                    <fieldset className="border rounded-md p-3 space-y-2">
-                      <legend className="text-xs font-semibold text-gray-500 px-1 uppercase tracking-wider">Line items</legend>
+                  <fieldset className="border rounded-md p-3 space-y-2">
+                    <legend className="text-xs font-semibold text-gray-500 px-1 uppercase tracking-wider">Line items</legend>
+                    {printDraft.lineItems.length > 0 && (
                       <div className={cn(
                         'grid items-center gap-2 text-[10px] uppercase tracking-wider text-gray-400 px-0.5',
                         dialogMode === 'invoice'
-                          ? 'grid-cols-[minmax(0,1fr)_60px_90px]'
-                          : 'grid-cols-[minmax(0,1fr)_60px]',
+                          ? 'grid-cols-[minmax(0,1fr)_60px_90px_32px]'
+                          : 'grid-cols-[minmax(0,1fr)_60px_32px]',
                       )}>
-                        <div>Description</div>
+                        <div>Item name</div>
                         <div className="text-right">Qty</div>
                         {dialogMode === 'invoice' && <div className="text-right">Unit price</div>}
+                        <div />
                       </div>
-                      <div className="space-y-1.5">
-                        {items.map(it => {
-                          const ov = printDraft.itemOverrides[it.id]
-                          const updateItem = (next: Partial<ItemOverride>) =>
-                            setPrintDraft(d => d && ({
-                              ...d,
-                              itemOverrides: { ...d.itemOverrides, [it.id]: { ...d.itemOverrides[it.id], ...next } },
-                            }))
-                          return (
-                            <div key={it.id} className={cn(
-                              'grid items-center gap-2',
-                              dialogMode === 'invoice'
-                                ? 'grid-cols-[minmax(0,1fr)_60px_90px]'
-                                : 'grid-cols-[minmax(0,1fr)_60px]',
-                            )}>
-                              <Input
-                                className="h-8 text-sm"
-                                value={ov?.description ?? ''}
-                                onChange={e => updateItem({ description: e.target.value })}
-                              />
+                    )}
+                    <div className="space-y-1.5">
+                      {printDraft.lineItems.map((li, idx) => {
+                        const updateLine = (next: Partial<PrintLineItem>) =>
+                          setPrintDraft(d => d && ({
+                            ...d,
+                            lineItems: d.lineItems.map((l, i) => i === idx ? { ...l, ...next } : l),
+                          }))
+                        const removeLine = () =>
+                          setPrintDraft(d => d && ({
+                            ...d,
+                            lineItems: d.lineItems.filter((_, i) => i !== idx),
+                          }))
+                        return (
+                          <div key={li.id} className={cn(
+                            'grid items-center gap-2',
+                            dialogMode === 'invoice'
+                              ? 'grid-cols-[minmax(0,1fr)_60px_90px_32px]'
+                              : 'grid-cols-[minmax(0,1fr)_60px_32px]',
+                          )}>
+                            <Input
+                              className="h-8 text-sm"
+                              placeholder="Item name"
+                              value={li.description}
+                              onChange={e => updateLine({ description: e.target.value })}
+                            />
+                            <Input
+                              className="h-8 text-sm text-right tabular-nums"
+                              type="number"
+                              step="1"
+                              min="1"
+                              value={li.quantity}
+                              onChange={e => updateLine({ quantity: Math.max(1, Math.floor(parseFloat(e.target.value) || 1)) })}
+                            />
+                            {dialogMode === 'invoice' && (
                               <Input
                                 className="h-8 text-sm text-right tabular-nums"
                                 type="number"
-                                step="1"
-                                min="1"
-                                value={ov?.quantity ?? 1}
-                                onChange={e => updateItem({ quantity: Math.max(1, Math.floor(parseFloat(e.target.value) || 1)) })}
+                                step="0.01"
+                                min="0"
+                                value={li.unitPrice}
+                                onChange={e => updateLine({ unitPrice: Number(e.target.value) || 0 })}
                               />
-                              {dialogMode === 'invoice' && (
-                                <Input
-                                  className="h-8 text-sm text-right tabular-nums"
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={ov?.unitPrice ?? 0}
-                                  onChange={e => updateItem({ unitPrice: Number(e.target.value) || 0 })}
-                                />
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                      {dialogMode === 'invoice' && draftResolved && (
-                        <div className="flex justify-between items-center pt-2 border-t text-sm">
-                          <span className="text-gray-500">Total</span>
-                          <span className="font-semibold tabular-nums">{formatCurrency(draftResolved.previewTotal)}</span>
-                        </div>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-gray-400 hover:text-red-600"
+                              onClick={removeLine}
+                              aria-label="Remove line item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )
+                      })}
+                      {printDraft.lineItems.length === 0 && (
+                        <p className="text-xs text-gray-400 py-1">No line items. Add one below.</p>
                       )}
-                    </fieldset>
-                  )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-full"
+                      onClick={() =>
+                        setPrintDraft(d => d && ({
+                          ...d,
+                          lineItems: [...d.lineItems, {
+                            id: `new-${newLineId.current++}`,
+                            description: '',
+                            quantity: 1,
+                            unitPrice: 0,
+                            productId: null,
+                          }],
+                        }))
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-1" />Add line item
+                    </Button>
+                    {dialogMode === 'invoice' && draftResolved && (
+                      <div className="flex justify-between items-center pt-2 border-t text-sm">
+                        <span className="text-gray-500">Total</span>
+                        <span className="font-semibold tabular-nums">{formatCurrency(draftResolved.previewTotal)}</span>
+                      </div>
+                    )}
+                  </fieldset>
 
                   {dialogMode === 'delivery' && (
                     <div className="space-y-1.5">
@@ -851,8 +934,8 @@ export function InvoiceDocument({
               <div className="space-y-3">
                 <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Bill To</div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Name</Label>
-                  <Input value={editBillToName} onChange={e => setEditBillToName(e.target.value)} placeholder="Recipient name" />
+                  <Label className="text-xs">Clinic</Label>
+                  <Input value={editBillToName} onChange={e => setEditBillToName(e.target.value)} placeholder="Clinic name" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Contact person</Label>
@@ -860,7 +943,7 @@ export function InvoiceDocument({
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Phone</Label>
-                  <Input value={editBillToPhone} onChange={e => setEditBillToPhone(e.target.value)} placeholder="Optional" />
+                  <PhoneInput value={editBillToPhone} onChange={setEditBillToPhone} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Address</Label>
@@ -870,8 +953,8 @@ export function InvoiceDocument({
               <div className="space-y-3">
                 <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Deliver To</div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Name</Label>
-                  <Input value={editShipToName} onChange={e => setEditShipToName(e.target.value)} placeholder="Recipient name" />
+                  <Label className="text-xs">Clinic</Label>
+                  <Input value={editShipToName} onChange={e => setEditShipToName(e.target.value)} placeholder="Clinic name" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Contact person</Label>
