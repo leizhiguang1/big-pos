@@ -16,6 +16,7 @@ import { ArrowLeft, KeyRound, PencilLine, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Profile, Role } from '@/lib/database.types'
 import { createEmployee, updateEmployee, resetPin, setActive, deleteEmployee } from '@/lib/auth/employee-actions'
+import { selectableRoles } from './role-filter'
 
 type DialogState =
   | { mode: 'closed' }
@@ -277,7 +278,7 @@ function EmployeeDialog({
                 <Select value={roleId} onValueChange={setRoleId}>
                   <SelectTrigger><SelectValue placeholder="Choose a role" /></SelectTrigger>
                   <SelectContent>
-                    {roles.map(r => (
+                    {selectableRoles(roles, roleId).map(r => (
                       <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                     ))}
                   </SelectContent>
