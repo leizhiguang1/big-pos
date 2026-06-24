@@ -235,22 +235,24 @@ export type Database = {
           created_by: string
           customer_id: string
           delivery_address: string | null
-          discount_amount: number
-          discount_pct: number
           doctor: string | null
+          delivery_order_number: string
           due_date: string
           id: string
           invoice_date: string
+          invoice_notes: string[] | null
           invoice_number: string
           notes: string | null
           patient: string | null
+          payment_account_name: string | null
+          payment_account_number: string | null
+          payment_bank_name: string | null
+          payment_note: string | null
           service_status_id: string | null
           ship_to_contact: string | null
           ship_to_name: string | null
           status: string
           subtotal: number
-          tax_amount: number
-          tax_rate: number
           total: number
           void_reason: string | null
           voided_at: string | null
@@ -265,22 +267,24 @@ export type Database = {
           created_by: string
           customer_id: string
           delivery_address?: string | null
-          discount_amount?: number
-          discount_pct?: number
+          delivery_order_number?: string
           doctor?: string | null
           due_date: string
           id?: string
           invoice_date?: string
+          invoice_notes?: string[] | null
           invoice_number: string
           notes?: string | null
           patient?: string | null
+          payment_account_name?: string | null
+          payment_account_number?: string | null
+          payment_bank_name?: string | null
+          payment_note?: string | null
           service_status_id?: string | null
           ship_to_contact?: string | null
           ship_to_name?: string | null
           status?: string
           subtotal?: number
-          tax_amount?: number
-          tax_rate?: number
           total?: number
           void_reason?: string | null
           voided_at?: string | null
@@ -295,22 +299,24 @@ export type Database = {
           created_by?: string
           customer_id?: string
           delivery_address?: string | null
-          discount_amount?: number
-          discount_pct?: number
+          delivery_order_number?: string
           doctor?: string | null
           due_date?: string
           id?: string
           invoice_date?: string
+          invoice_notes?: string[] | null
           invoice_number?: string
           notes?: string | null
           patient?: string | null
+          payment_account_name?: string | null
+          payment_account_number?: string | null
+          payment_bank_name?: string | null
+          payment_note?: string | null
           service_status_id?: string | null
           ship_to_contact?: string | null
           ship_to_name?: string | null
           status?: string
           subtotal?: number
-          tax_amount?: number
-          tax_rate?: number
           total?: number
           void_reason?: string | null
           voided_at?: string | null
@@ -329,6 +335,50 @@ export type Database = {
             columns: ["service_status_id"]
             isOneToOne: false
             referencedRelation: "service_statuses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_billing_settings: {
+        Row: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          id: string
+          invoice_notes: string[]
+          payment_note: string
+          payment_terms_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          id?: string
+          invoice_notes?: string[]
+          payment_note: string
+          payment_terms_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          bank_name?: string
+          id?: string
+          invoice_notes?: string[]
+          payment_note?: string
+          payment_terms_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_billing_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -610,6 +660,7 @@ export type Database = {
         Args: { p_invoice: Json; p_items: Json }
         Returns: string
       }
+      generate_delivery_order_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       mark_invoice_paid: {

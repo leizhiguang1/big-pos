@@ -18,15 +18,14 @@
 // action failure the state reverts and a toast appears. router.refresh() syncs
 // the server state after either outcome.
 
-import { useMemo, useOptimistic, useTransition } from 'react'
+import { useMemo, useOptimistic, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/feedback/toast'
 import { cn } from '@/lib/utils'
-import { todayISODate } from '@/lib/utils'
 import { WORK_STATUSES } from '@/lib/work-status'
 import { workStatusColor, workStatusLabel, type WorkStatusDisplay } from '@/lib/work-status-config'
 import { updateWorkStatusAction } from '@/data/invoice-actions'
-import { WorkStageStepper } from '@/components/work/WorkStageStepper'
+import { WorkStageChips } from '@/components/work/WorkStageChips'
 import { WorkStatusSelect, ADVANCE_VALUE } from '@/components/work-status-select'
 import { decodeWork, encodeWork, nextWorkStep } from '@/lib/work-stages'
 import type { WorkStatus, WorkStage } from '@/lib/database.types'
@@ -46,7 +45,6 @@ function applyOptimisticMove(rows: WorkQueueRow[], move: OptimisticItemMove): Wo
 
 function ItemCard({
   row,
-  today,
   activeStages,
   stagesById,
   statusConfigs,
@@ -55,7 +53,6 @@ function ItemCard({
   onStatusChange,
 }: {
   row: WorkQueueRow
-  today: string
   activeStages: WorkStage[]
   stagesById: Map<string, WorkStage>
   statusConfigs: WorkStatusDisplay[]
@@ -63,8 +60,6 @@ function ItemCard({
   onClick: (invoiceId: string | undefined) => void
   onStatusChange: (row: WorkQueueRow, value: string) => void
 }) {
-  const dueDate = row.invoices?.due_date ?? null
-  const isPastDue = dueDate != null && dueDate < today && row.work_status !== 'delivered'
   const isInProgress = row.work_status === 'in_progress'
 
   return (
@@ -87,7 +82,7 @@ function ItemCard({
       {isInProgress && (
         <div className="mt-2" onClick={e => e.stopPropagation()}>
           {row.stage_id ? (
-            <WorkStageStepper activeStages={activeStages} workStatus={row.work_status} stageId={row.stage_id} />
+            <WorkStageChips activeStages={activeStages} workStatus={row.work_status} stageId={row.stage_id} statusConfigs={statusConfigs} onSelect={stageId => onStatusChange(row, `stage:${stageId}`)} />
           ) : (
             <WorkStatusSelect
               value={encodeWork(row.work_status, row.stage_id)}
@@ -105,11 +100,6 @@ function ItemCard({
 
       <div className="flex items-center justify-between mt-2">
         <span className="text-xs font-mono text-muted-foreground">{row.invoices?.invoice_number ?? '—'}</span>
-        {dueDate && (
-          <span className={cn('text-xs', isPastDue ? 'text-red-600 font-medium' : 'text-muted-foreground')}>
-            Due {dueDate}{isPastDue && ' · overdue'}
-          </span>
-        )}
       </div>
     </div>
   )
@@ -118,7 +108,6 @@ function ItemCard({
 function KanbanColumn({
   status,
   rows,
-  today,
   activeStages,
   stagesById,
   onDragStart,
@@ -129,7 +118,6 @@ function KanbanColumn({
 }: {
   status: WorkStatus
   rows: WorkQueueRow[]
-  today: string
   activeStages: WorkStage[]
   stagesById: Map<string, WorkStage>
   onDragStart: (e: React.DragEvent, itemId: string) => void
@@ -174,7 +162,6 @@ function KanbanColumn({
           <ItemCard
             key={r.id}
             row={r}
-            today={today}
             activeStages={activeStages}
             stagesById={stagesById}
             statusConfigs={statusConfigs}
@@ -200,8 +187,6 @@ export function KanbanBoard({ rows, stages, statusConfigs }: { rows: WorkQueueRo
   const { show } = useToast()
   const [, startTransition] = useTransition()
 
-  const today = todayISODate()
-
   const [optimisticRows, applyOptimistic] = useOptimistic(
     rows,
     applyOptimisticMove,
@@ -209,6 +194,10 @@ export function KanbanBoard({ rows, stages, statusConfigs }: { rows: WorkQueueRo
 
   const stagesById = useMemo(() => new Map(stages.map(s => [s.id, s])), [stages])
   const activeStages = useMemo(() => stages.filter(s => s.is_active), [stages])
+
+  // "Done" (delivered) is the terminal state — its column is hidden by default so
+  // completed work doesn't pile up and lengthen the board. A toggle reveals it.
+  const [showDone, setShowDone] = useState(false)
 
   // Group items into columns by their own work status.
   const rowsByStatus = useMemo(() => {
@@ -233,7 +222,7 @@ export function KanbanBoard({ rows, stages, statusConfigs }: { rows: WorkQueueRo
   // Set-stage dropdown change on a card (resolves Advance + Resume-less sentinels).
   const onCardStatusChange = (row: WorkQueueRow, value: string) => {
     const resolved = value === ADVANCE_VALUE
-      ? nextWorkStep(activeStages, row.work_status, row.stage_id)
+      ? nextWorkStep(row.work_status)
       : decodeWork(value)
     if (!resolved) return
     applyMove(row.id, resolved.work_status, resolved.stage_id)
@@ -268,24 +257,37 @@ export function KanbanBoard({ rows, stages, statusConfigs }: { rows: WorkQueueRo
     if (invoiceId) router.push(`/invoices/${invoiceId}`)
   }
 
+  const doneCount = rowsByStatus.get('delivered')?.length ?? 0
+  const columns = showDone ? WORK_STATUSES : WORK_STATUSES.filter(s => s !== 'delivered')
+
   return (
-    <div className="-mx-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
-      <div className="flex gap-4 min-w-max">
-        {WORK_STATUSES.map(status => (
-          <KanbanColumn
-            key={status}
-            status={status}
-            rows={rowsByStatus.get(status) ?? []}
-            today={today}
-            activeStages={activeStages}
-            stagesById={stagesById}
-            statusConfigs={statusConfigs}
-            onDragStart={handleDragStart}
-            onDrop={handleDrop}
-            onCardClick={handleCardClick}
-            onStatusChange={onCardStatusChange}
-          />
-        ))}
+    <div className="space-y-2">
+      <div className="flex justify-end px-4 sm:px-0">
+        <button
+          type="button"
+          onClick={() => setShowDone(v => !v)}
+          className="text-xs font-medium text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+        >
+          {showDone ? 'Hide done' : `Show done${doneCount ? ` (${doneCount})` : ''}`}
+        </button>
+      </div>
+      <div className="-mx-4 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-4 min-w-max">
+          {columns.map(status => (
+            <KanbanColumn
+              key={status}
+              status={status}
+              rows={rowsByStatus.get(status) ?? []}
+              activeStages={activeStages}
+              stagesById={stagesById}
+              statusConfigs={statusConfigs}
+              onDragStart={handleDragStart}
+              onDrop={handleDrop}
+              onCardClick={handleCardClick}
+              onStatusChange={onCardStatusChange}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )

@@ -22,26 +22,26 @@ export function CustomerDetailHeader({
   const { hasPermission } = useAuth()
 
   return (
-    <div className="flex items-start justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{clinicName}</h1>
+          <h1 className="text-xl font-bold text-foreground sm:text-2xl">{clinicName}</h1>
           {contactPerson && <p className="text-sm text-muted-foreground mt-0.5">{contactPerson}</p>}
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
         {hasPermission('customers.edit') && (
-          <Button variant="outline" size="sm" asChild>
+          <Button className="w-full sm:w-auto" variant="outline" size="sm" asChild>
             <Link href={`/customers/${id}/edit`}><Edit className="h-4 w-4 mr-2" />Edit</Link>
           </Button>
         )}
-        <Button variant="outline" size="sm" asChild>
+        <Button className="w-full sm:w-auto" variant="outline" size="sm" asChild>
           <Link href={`/customers/${id}/statement`}><FileText className="h-4 w-4 mr-2" />Statement</Link>
         </Button>
-        <Button size="sm" asChild>
+        <Button className="col-span-2 w-full sm:col-span-1 sm:w-auto" size="sm" asChild>
           <Link href={`/invoices/new?customer=${id}`}><Plus className="h-4 w-4 mr-2" />New Invoice</Link>
         </Button>
       </div>

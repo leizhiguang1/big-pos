@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ServiceStatusSelectItem } from '@/components/invoices/ServiceStatusSelectItem'
+import { ManageOptionsLink } from '@/components/ui/manage-options-link'
 import { canEditInvoice } from '@/lib/invoice-permissions'
 import { DEFAULT_COLOR } from '@/lib/service-status'
 import { cn } from '@/lib/utils'
@@ -62,7 +63,7 @@ export function CaseDetailsEditor({ invoice, serviceStatusId: initialServiceStat
     <Card className="print:hidden">
       <CardHeader><CardTitle className="text-base">Case Details</CardTitle></CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-2">
             <Label>Patient</Label>
             {canEdit ? (
@@ -108,6 +109,7 @@ export function CaseDetailsEditor({ invoice, serviceStatusId: initialServiceStat
                 {serviceStatuses.map(s => (
                   <ServiceStatusSelectItem key={s.id} status={s} />
                 ))}
+                <ManageOptionsLink href="/settings/service-statuses" label="Manage service statuses" />
               </SelectContent>
             </Select>
           </div>

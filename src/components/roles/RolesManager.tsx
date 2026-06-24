@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, Plus, Pencil, Trash2, ShieldCheck } from 'lucide-react'
+import { TableActionButton } from '@/components/ui/table-actions'
+import { ArrowLeft, PencilLine, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { PERMISSION_GROUPS, PERMISSION_REQUIRES, type Permission } from '@/domain/permissions'
 import { createRole, updateRole, deleteRole } from '@/lib/auth/role-actions'
 import type { Role } from '@/lib/database.types'
@@ -59,23 +60,23 @@ export default function RolesManager() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full max-w-4xl space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <Link href="/settings"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Roles &amp; Permissions</h1>
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">Roles &amp; Permissions</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Create roles and choose what each one can do.</p>
           </div>
         </div>
-        <Button onClick={() => setDialog({ mode: 'create' })}><Plus className="h-4 w-4 mr-2" />New role</Button>
+        <Button className="w-full sm:w-auto" onClick={() => setDialog({ mode: 'create' })}><Plus className="h-4 w-4 mr-2" />New role</Button>
       </div>
 
       <Card>
         <CardContent className="p-0 divide-y">
           {loading && <p className="text-center py-8 text-muted-foreground">Loading…</p>}
           {!loading && rows.map(role => (
-            <div key={role.id} className="flex items-center gap-4 px-5 py-4">
+            <div key={role.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
               <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
                 <ShieldCheck className="h-5 w-5" />
               </div>
@@ -87,13 +88,9 @@ export default function RolesManager() {
                 </p>
               </div>
               {!role.is_system && (
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDialog({ mode: 'edit', role })}>
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" disabled={role.userCount > 0} onClick={() => remove(role)}>
-                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                  </Button>
+                <div className="flex gap-2 self-end sm:self-auto">
+                  <TableActionButton label="Edit role" icon={PencilLine} tone="primary" onClick={() => setDialog({ mode: 'edit', role })} />
+                  <TableActionButton label="Delete role" icon={Trash2} tone="danger" disabled={role.userCount > 0} onClick={() => remove(role)} />
                 </div>
               )}
             </div>
@@ -202,7 +199,7 @@ function RoleDialog({
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
+            <div className="flex items-center justify-between gap-3 border-b pb-2">
               <Label>Permissions</Label>
               <button
                 type="button"
@@ -217,7 +214,7 @@ function RoleDialog({
               const groupSelected = keys.every(k => perms.has(k))
               return (
                 <div key={group.label}>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2 flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
                     <button
                       type="button"

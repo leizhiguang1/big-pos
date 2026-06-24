@@ -168,7 +168,7 @@ Files: `invoices/page.tsx` (list), `invoices/[id]/page.tsx` (detail, ~1290 lines
 - **Payments:** `payments.insert`, then re-read paid-sum from DB and set status via `nextStatusAfterPayment`. Payment form uses RHF + `useWatch` to warn if amount > outstanding. *(Non-atomic: two sequential writes.)*
 - **Per-item work status:** `invoice_items.update` (the DB trigger logs history). *(See 5.6.)*
 - **Recipient edits:** update the invoice snapshot, optionally cascading to the customer master.
-- **Void / restore:** the only business action behind a permission-gated server action (`lib/invoices/void-actions.ts`, `requirePermission('invoices.manage')`, service-role). Soft delete — sets/clears `voided_at/by/reason`.
+- **Void:** the only business action behind a permission-gated server action (`lib/invoices/void-actions.ts`, `requirePermission('invoices.manage')`, service-role). Soft delete — sets `voided_at/by/reason`; voided invoices are terminal in the app.
 - **Print/receipt:** `renderDocBody` renders both the on-screen invoice and a print/delivery doc; a print dialog shows a live preview + an editor of per-printout `PrintOverrides` (never saved); `window.print()` via a `printNonce` effect + `afterprint` reset; voided invoices get a diagonal VOID watermark.
 
 **Invoice lifecycle / status logic** (`src/lib/invoice-status.ts`, pure + tested):

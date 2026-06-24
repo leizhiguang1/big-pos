@@ -13,7 +13,7 @@ The ONLY place application code talks to Supabase. One module per aggregate.
 
 A `'use server'` file may export ONLY async functions — keep shared types in a
 plain module (or `export type`, which is erased) and import value helpers
-(e.g. void/restore) from their own files rather than re-exporting them here.
+(e.g. void) from their own files rather than re-exporting them here.
 
 Invoices are implemented (`invoices.ts` reads, `invoice-actions.ts` writes) as of
 Plan 3. Other aggregates follow the same shape as they are migrated.

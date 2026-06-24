@@ -5,6 +5,10 @@ const product = (over: Record<string, unknown> = {}) => ({
   name: 'Crown', description: null, unit_price: 100, unit: 'per unit',
   min_unit_price: null, max_unit_price: null, ...over,
 })
+const customer = (over: Record<string, unknown> = {}) => ({
+  clinic_name: 'Klinik Gigi', contact_person: 'Dr Lee', phone: '0123456789',
+  email: 'clinic@example.com', billing_address: '1 Main St', delivery_address: '1 Main St', ...over,
+})
 describe('schemas', () => {
   it('rejects non-positive payment', () =>
     expect(paymentInputSchema.safeParse({ amount: 0 }).success).toBe(false))
@@ -12,12 +16,18 @@ describe('schemas', () => {
     expect(invoiceInputSchema.safeParse({ customer_id: 'x', due_date: '2026-01-01', items: [] }).success).toBe(false))
 
   it('requires a clinic name on a customer', () =>
-    expect(customerInputSchema.safeParse({ clinic_name: '' }).success).toBe(false))
-  it('accepts a minimal customer (clinic name only)', () =>
-    expect(customerInputSchema.safeParse({ clinic_name: 'Klinik Gigi' }).success).toBe(true))
-  it('accepts an empty email but rejects a malformed one', () => {
-    expect(customerInputSchema.safeParse({ clinic_name: 'A', email: '' }).success).toBe(true)
-    expect(customerInputSchema.safeParse({ clinic_name: 'A', email: 'not-an-email' }).success).toBe(false)
+    expect(customerInputSchema.safeParse(customer({ clinic_name: '' })).success).toBe(false))
+  it('accepts a fully-populated customer', () =>
+    expect(customerInputSchema.safeParse(customer()).success).toBe(true))
+  it('requires contact details (contact person, phone, addresses)', () => {
+    expect(customerInputSchema.safeParse(customer({ contact_person: '' })).success).toBe(false)
+    expect(customerInputSchema.safeParse(customer({ phone: '' })).success).toBe(false)
+    expect(customerInputSchema.safeParse(customer({ billing_address: '' })).success).toBe(false)
+    expect(customerInputSchema.safeParse(customer({ delivery_address: '' })).success).toBe(false)
+  })
+  it('requires a valid email and rejects empty or malformed', () => {
+    expect(customerInputSchema.safeParse(customer({ email: '' })).success).toBe(false)
+    expect(customerInputSchema.safeParse(customer({ email: 'not-an-email' })).success).toBe(false)
   })
 
   it('accepts a single-price product', () =>

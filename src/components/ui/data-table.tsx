@@ -45,8 +45,8 @@ export function DataTable<T>({
   const showEmpty = !loading && rows.length === 0
 
   return (
-    <div className="w-full overflow-auto">
-      <Table>
+    <div className="w-full overflow-hidden">
+      <Table className="min-w-[44rem]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             {columns.map(c => {
@@ -123,7 +123,7 @@ export function DataTable<T>({
             ))}
         </TableBody>
       </Table>
-      {footer && <div className="border-t px-4 py-3">{footer}</div>}
+      {footer && <div className="border-t px-3 py-3 sm:px-4">{footer}</div>}
     </div>
   )
 }

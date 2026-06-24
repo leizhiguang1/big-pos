@@ -1,17 +1,16 @@
 'use client'
 
-// Thin client wrapper for the Work page that owns the Board/List/Calendar toggle.
+// Thin client wrapper for the Work page that owns the List/Board toggle.
 // Receives the same rows/stages from the server component; no fetching here.
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { KanbanBoard } from '@/components/work/KanbanBoard'
 import { WorkQueueClient } from '@/components/work/WorkQueueClient'
-import { CasesCalendar } from '@/components/work/CasesCalendar'
 import type { WorkStage, WorkStatusConfig } from '@/lib/database.types'
 import type { WorkQueueRow } from '@/data/work'
 
-type ViewMode = 'board' | 'list' | 'calendar'
+type ViewMode = 'board' | 'list'
 
 export function WorkViewToggle({
   rows,
@@ -22,7 +21,7 @@ export function WorkViewToggle({
   stages: WorkStage[]
   statusConfigs: WorkStatusConfig[]
 }) {
-  const [view, setView] = useState<ViewMode>('board')
+  const [view, setView] = useState<ViewMode>('list')
 
   return (
     <div className="space-y-6">
@@ -35,22 +34,17 @@ export function WorkViewToggle({
           </p>
         </div>
 
-        {/* Board | List | Calendar toggle */}
-        <div className="grid w-full grid-cols-3 overflow-hidden rounded-lg border border-border text-sm sm:flex sm:w-auto sm:items-center">
-          <ToggleButton
-            active={view === 'board'}
-            onClick={() => setView('board')}
-            label="Board"
-          />
+        {/* List | Board toggle */}
+        <div className="grid w-full grid-cols-2 overflow-hidden rounded-lg border border-border text-sm sm:flex sm:w-auto sm:items-center">
           <ToggleButton
             active={view === 'list'}
             onClick={() => setView('list')}
             label="List"
           />
           <ToggleButton
-            active={view === 'calendar'}
-            onClick={() => setView('calendar')}
-            label="Calendar"
+            active={view === 'board'}
+            onClick={() => setView('board')}
+            label="Board"
           />
         </div>
       </div>
@@ -58,8 +52,6 @@ export function WorkViewToggle({
       {/* View */}
       {view === 'board' ? (
         <KanbanBoard rows={rows} stages={stages} statusConfigs={statusConfigs} />
-      ) : view === 'calendar' ? (
-        <CasesCalendar rows={rows} />
       ) : (
         <WorkQueueClient rows={rows} stages={stages} statusConfigs={statusConfigs} hideHeader />
       )}

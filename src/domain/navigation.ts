@@ -11,6 +11,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard, Users, FileText, Wrench, Package, BarChart3,
   ClipboardList, ListChecks, UserCog, ShieldCheck, Ruler, SlidersHorizontal,
+  Landmark,
 } from 'lucide-react'
 import type { Permission } from '@/domain/permissions'
 
@@ -41,6 +42,7 @@ export const NAV: NavEntry[] = [
   { href: '/reports', label: 'Reports', icon: BarChart3, area: 'main', permission: 'reports.view' },
 
   // Configuration & administration — inside Settings.
+  { href: '/settings/billing', label: 'Billing', icon: Landmark, area: 'settings', group: 'Business', permission: 'settings.manage' },
   { href: '/settings/service-statuses', label: 'Service Statuses', icon: ClipboardList, area: 'settings', group: 'Lab Setup', permission: 'settings.manage' },
   { href: '/settings/work-statuses', label: 'Work Statuses', icon: SlidersHorizontal, area: 'settings', group: 'Lab Setup', permission: 'settings.manage' },
   { href: '/settings/work-stages', label: 'In-Progress Stages', icon: ListChecks, area: 'settings', group: 'Lab Setup', permission: 'settings.manage' },

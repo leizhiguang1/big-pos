@@ -15,14 +15,16 @@ import { DataTable } from '@/components/ui/data-table'
 import type { Column } from '@/lib/data-table'
 import { EmptyState } from '@/components/ui/empty-state'
 import { listViewState } from '@/lib/list-view-state'
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { ActiveSwitch, TableActionButton } from '@/components/ui/table-actions'
 import { ListToolbar } from '@/components/ui/list-toolbar'
 import { Pagination } from '@/components/ui/pagination'
 import { FilterChips, type FilterChip } from '@/components/ui/filter-chips'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { ManageOptionsLink } from '@/components/ui/manage-options-link'
 import { buildUnitOptions } from '@/lib/units'
 import { formatCurrency } from '@/lib/utils'
-import { Plus, Pencil, ToggleLeft, ToggleRight, Package } from 'lucide-react'
+import { Package, PencilLine, Plus } from 'lucide-react'
 import type { Product, Unit } from '@/lib/database.types'
 import type { ProductListPage, ProductView } from '@/data/products'
 import { useListUrlState, type ListUrlState } from '@/lib/use-list-url-state'
@@ -206,31 +208,15 @@ export function ProductsClient({
       width: 'w-24',
       cell: p =>
         canEdit ? (
-          <div className="flex justify-end gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit product" onClick={() => openEdit(p)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Edit product</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  aria-label={p.active ? 'Deactivate product' : 'Activate product'}
-                  onClick={() => toggleActive(p)}
-                >
-                  {p.active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {p.active ? 'Active — click to deactivate (hides from new invoices)' : 'Inactive — click to activate'}
-              </TooltipContent>
-            </Tooltip>
+          <div className="flex items-center justify-end gap-2">
+            <TableActionButton label="Edit product" icon={PencilLine} tone="primary" onClick={() => openEdit(p)} />
+            <ActiveSwitch
+              checked={p.active}
+              onCheckedChange={() => toggleActive(p)}
+              activeLabel="Active"
+              inactiveLabel="Inactive"
+              tooltip={p.active ? 'Hide from new invoices' : 'Show in new invoices'}
+            />
           </div>
         ) : null,
     },
@@ -258,26 +244,28 @@ export function ProductsClient({
   return (
     <TooltipProvider delayDuration={200}>
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Products & Services</h1>
+          <h1 className="text-xl font-bold text-foreground sm:text-2xl">Products & Services</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Price catalog for invoicing</p>
         </div>
-        {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Product</Button>}
+        {canEdit && <Button className="w-full sm:w-auto" onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Product</Button>}
       </div>
 
-      <ListToolbar value={search} onChange={setSearch} placeholder="Search products…">
-        <Select value={activeFilter} onValueChange={v => setView(v as ProductView)}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Active only</SelectItem>
-            <SelectItem value="inactive">Inactive only</SelectItem>
-            <SelectItem value="all">All</SelectItem>
-          </SelectContent>
-        </Select>
-      </ListToolbar>
+      <div className="space-y-3">
+        <ListToolbar value={search} onChange={setSearch} placeholder="Search products…">
+          <Select value={activeFilter} onValueChange={v => setView(v as ProductView)}>
+            <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active only</SelectItem>
+              <SelectItem value="inactive">Inactive only</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+            </SelectContent>
+          </Select>
+        </ListToolbar>
 
-      <FilterChips chips={chips} />
+        <FilterChips chips={chips} />
+      </div>
 
       <Card>
         <CardContent className="p-0">
@@ -326,7 +314,7 @@ export function ProductsClient({
                 {errors.unit_price && <p className="text-xs text-destructive">{errors.unit_price.message}</p>}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Min price (MYR) *</Label>
                   <Input type="number" step="0.01" min="0" {...register('min_unit_price')} />
@@ -369,6 +357,7 @@ export function ProductsClient({
                               {unitLabels.includes(u) ? u : `${u} (inactive)`}
                             </SelectItem>
                           ))}
+                          <ManageOptionsLink href="/settings/units" label="Manage units" />
                         </SelectContent>
                       </Select>
                     )}

@@ -49,29 +49,31 @@ export function CustomerListClient({ page, state }: { page: CustomerListPage; st
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Clinics</h1>
+          <h1 className="text-xl font-bold text-foreground sm:text-2xl">Clinics</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{page.total} registered</p>
         </div>
         {hasPermission('customers.edit') && (
-          <Button asChild>
+          <Button className="w-full sm:w-auto" asChild>
             <Link href="/customers/new"><Plus className="h-4 w-4 mr-2" />New Clinic</Link>
           </Button>
         )}
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search clinic, contact or phone…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+      <div className="space-y-3">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search clinic, contact or phone…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
-      <FilterChips chips={chips} />
+        <FilterChips chips={chips} />
+      </div>
 
       <Card>
         <CardContent className="p-0">

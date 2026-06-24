@@ -28,14 +28,14 @@ export function Pagination({
   className,
 }: PaginationProps) {
   return (
-    <div className={cn('flex items-center justify-between text-sm text-muted-foreground', className)}>
+    <div className={cn('flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between', className)}>
       <span>
         {filteredCount === 0
           ? `No ${itemLabel}`
           : `Showing ${pageStart}–${pageEnd} of ${filteredCount} ${itemLabel}`}
       </span>
       {totalPages > 1 && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>
             <ChevronLeft className="h-4 w-4" />
             Prev

@@ -44,6 +44,7 @@ export type Payment = Tables<'payments'>
 export type Credit = Tables<'credits'>
 export type InvoiceItem = Tables<'invoice_items'>
 export type InvoiceItemStatusHistory = Tables<'invoice_item_status_history'>
+export type LabBillingSettings = Tables<'lab_billing_settings'>
 
 // Invoice carries the nested relations that
 // `select('*, customers(*), invoice_items(*), payments(*))` queries return.

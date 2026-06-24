@@ -14,6 +14,7 @@ import { ActionsBar } from './ActionsBar'
 import { InvoiceDocument } from './InvoiceDocument'
 import type { InvoiceItem, Product, ServiceStatus, WorkStage, WorkStatusConfig } from '@/lib/database.types'
 import type { InvoiceDetail } from '@/data/invoices'
+import type { BillingSettings } from '@/lib/config'
 
 type PrintMode = 'invoice' | 'delivery' | 'work_ticket'
 
@@ -29,6 +30,7 @@ export type InvoiceDetailClientProps = {
   customerName: string | null
   totalPaid: number
   unrecorded: number
+  billingSettings: BillingSettings
   /** Editors + status strip, rendered between the actions bar and the printable document. */
   children?: ReactNode
 }
@@ -44,6 +46,7 @@ export function InvoiceDetailClient({
   customerName,
   totalPaid,
   unrecorded,
+  billingSettings,
   children,
 }: InvoiceDetailClientProps) {
   const { hasPermission } = useAuth()
@@ -69,6 +72,7 @@ export function InvoiceDetailClient({
         stages={stages}
         workStatusConfigs={workStatusConfigs}
         totalPaid={totalPaid}
+        billingSettings={billingSettings}
         canEdit={canEdit}
         onPrintReady={open => { printOpenRef.current = open }}
       />

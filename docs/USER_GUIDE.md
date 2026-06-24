@@ -27,7 +27,7 @@ grants a set of permission keys:
 |---|---|
 | `invoices.view` | See invoices and the Work board |
 | `invoices.edit` | Create invoices, edit **draft** invoices |
-| `invoices.manage` | Record payments, **void/restore**, edit **already-sent** invoices |
+| `invoices.manage` | Record payments, **void**, edit **already-sent** invoices |
 | `customers.view` | See the clinic directory |
 | `customers.edit` | Create / edit clinics |
 | `products.view` | See the product catalogue |
@@ -55,7 +55,7 @@ to open redirect you to the Dashboard.
    - **Clinic Name** (required), SSM No., Contact Person, Phone, Email
    - **Billing Address**, **Delivery Address**
    - Notes
-3. Save. Invoice payment terms and discount are set per invoice, not on the clinic record.
+3. Save. Invoice payment terms are set per invoice, not on the clinic record.
 
 ### Clinic detail / statement
 Opening a clinic shows contact details, a billing summary (Total Billed, Outstanding,
@@ -89,8 +89,7 @@ goodwill).
    lab-wide default payment terms and can be edited per invoice.
 3. Add **line items**: search a product to add it, set quantity and unit price. Each line
    can carry an internal **work note** (not printed to the customer).
-4. **Discount** (per-invoice %) and **SST tax** (%) apply in this order:
-   `total = subtotal − discount + tax`, where tax is charged on `(subtotal − discount)`.
+4. The invoice **total** is simply the sum of the line items — there is no discount or tax.
 5. Optionally set a different **Deliver-To** recipient (toggle).
 6. Save as **Draft** or **Create & Send**.
 
@@ -106,17 +105,17 @@ goodwill).
 3. The `record_payment` RPC inserts the payment and atomically recomputes status: if total
    paid ≥ invoice total → **paid**, otherwise → **partial**. The Payment History table updates.
 
-### Void / restore an invoice
+### Void an invoice
 1. Open the invoice → **Void** (shown only with `invoices.manage` on a non-voided invoice).
 2. Enter an optional reason and confirm. The invoice is **soft-deleted** (`voided_at`,
    `voided_by`, `void_reason` set) — it stays in the system, is locked for everyone (no
    edits, no payments), shows a **VOID watermark** when printed, and drops out of the Work
    queue and reports.
-3. **Restore** (same permission) reverses it — clears the void fields and unlocks it.
+3. A voided invoice cannot be restored in the app.
 
-> Error handling: if a void/restore fails on the server, the user sees a friendly message
+> Error handling: if voiding fails on the server, the user sees a friendly message
 > ("Could not void the invoice. Please try again.") while the **real** error is logged
-> server-side via `logServerError` (greppable tag `voidInvoice` / `restoreInvoice`). Note
+> server-side via `logServerError` (greppable tag `voidInvoice`). Note
 > void uses the **admin client**, so production needs `SUPABASE_SERVICE_ROLE_KEY` set.
 
 ### Edit an invoice
@@ -127,11 +126,11 @@ goodwill).
   in the document header, with an option to also save the change back to the clinic master.
 
 ### Printing (Invoice / Delivery Note)
-- The **Print** menu offers **Invoice** (prices, totals, discount/tax breakdown, bank
-  details) and **Delivery Note** (items + quantities, no prices).
+- The **Print** menu offers **Invoice** (prices, total, bank details) and **Delivery Note**
+  (items + quantities, no prices).
 - The print preview lets you **add / remove / edit line items** and rename a line for that
-  printout only — **nothing persists** to the saved invoice; totals recompute live in the
-  preview using the invoice's discount/tax rates.
+  printout only — **nothing persists** to the saved invoice; the total recomputes live in the
+  preview from the line amounts.
 
 ---
 
@@ -182,7 +181,7 @@ activate-toggle list:
   (Received, In Progress, Ready, Delivered, On Hold). The workflow keys do not change.
 - **Work Stages** — the In-Progress sub-stages (label + colour + order + active). Drives the
   work-status dropdown groups and the stepper.
-- **Service Statuses** — lab-to-doctor instructions printed on delivery notes (e.g. "Try in",
+- **Service Statuses** — lab-to-doctor instructions printed on delivery orders (e.g. "Try in",
   "Review case").
 - **Units** — units of measure for products (tooth, arch, case…). Feeds the product form.
 - **Employees** (`staff.manage`) — staff directory: add an employee (User ID + 6-digit PIN +
@@ -209,11 +208,11 @@ activate-toggle list:
 | Add a clinic | Clinics → Add Clinic | `customers.edit` |
 | Create an invoice | Invoices → New Invoice | `invoices.edit` |
 | Record a payment | Invoice → Record Payment | `invoices.manage` |
-| Void / restore an invoice | Invoice → Void / Restore | `invoices.manage` |
+| Void an invoice | Invoice → Void | `invoices.manage` |
 | Move a job to In Progress (a stage) | Work → status dropdown | `invoices.view` |
 | Put a job On Hold / Resume | Work → status dropdown | `invoices.view` |
 | Add an In-Progress sub-stage | Settings → Work Stages | `settings.manage` |
 | Add a product | Products → Add Product | `products.edit` |
 | Add a staff member | Settings → Employees | `staff.manage` |
 | Create a role | Settings → Roles & Permissions | Super Admin |
-| Print an invoice / delivery note | Invoice → Print | `invoices.view` |
+| Print an invoice / delivery order | Invoice → Print | `invoices.view` |

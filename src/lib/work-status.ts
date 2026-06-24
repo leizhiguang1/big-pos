@@ -12,7 +12,7 @@ export const WORK_STATUS_LABELS: Record<WorkStatus, string> = {
   received: 'Received',
   in_progress: 'In Progress',
   ready: 'Ready',
-  delivered: 'Delivered',
+  delivered: 'Done',
   on_hold: 'On Hold',
 }
 

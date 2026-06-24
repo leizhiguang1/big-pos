@@ -34,27 +34,3 @@ export async function voidInvoice(input: { id: string; reason?: string }): Promi
     return { ok: false, error: 'Could not void the invoice. Please try again.' }
   }
 }
-
-export async function restoreInvoice(input: { id: string }): Promise<ActionResult> {
-  try {
-    const gate = await requirePermission('invoices.manage')
-    if (!gate.ok) return gate
-
-    const admin = createAdminClient()
-    const { error } = await admin
-      .from('invoices')
-      .update({ voided_at: null, voided_by: null, void_reason: null })
-      .eq('id', input.id)
-    if (error) {
-      logServerError('restoreInvoice', error, { id: input.id })
-      return { ok: false, error: 'Could not restore the invoice. Please try again.' }
-    }
-
-    revalidatePath(`/invoices/${input.id}`)
-    revalidatePath('/invoices')
-    return { ok: true }
-  } catch (e) {
-    logServerError('restoreInvoice', e, { id: input.id })
-    return { ok: false, error: 'Could not restore the invoice. Please try again.' }
-  }
-}

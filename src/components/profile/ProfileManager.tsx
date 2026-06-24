@@ -17,14 +17,14 @@ export default function ProfileManager() {
     .map(p => p.label)
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">My Profile</h1>
+        <h1 className="text-xl font-bold text-foreground sm:text-2xl">My Profile</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Manage your own login and see what your role can do.</p>
       </div>
 
       <Card>
-        <CardContent className="p-5 space-y-1">
+        <CardContent className="space-y-1 p-4 sm:p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account</p>
           <p className="text-sm text-muted-foreground">User ID: <span className="font-medium">{username}</span></p>
           <p className="text-sm text-muted-foreground">Role: <span className="font-medium">{roleName}</span></p>
@@ -35,7 +35,7 @@ export default function ProfileManager() {
       <PinForm />
 
       <Card>
-        <CardContent className="p-5 space-y-2">
+        <CardContent className="space-y-2 p-4 sm:p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What I can do</p>
           {isSuperadmin ? (
             <p className="text-sm text-muted-foreground">All permissions (Super Admin).</p>
@@ -68,12 +68,12 @@ function NameForm({ initial }: { initial: string }) {
 
   return (
     <Card>
-      <CardContent className="p-5">
+      <CardContent className="p-4 sm:p-5">
         <form onSubmit={save} className="space-y-3">
           <Label>Display name</Label>
           <Input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name" />
           {msg && <p className={msg.ok ? 'text-sm text-green-600' : 'text-sm text-destructive'}>{msg.text}</p>}
-          <Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save name'}</Button>
+          <Button className="w-full sm:w-auto" type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save name'}</Button>
         </form>
       </CardContent>
     </Card>
@@ -99,7 +99,7 @@ function PinForm() {
 
   return (
     <Card>
-      <CardContent className="p-5">
+      <CardContent className="p-4 sm:p-5">
         <form onSubmit={save} className="space-y-3">
           <Label>Change PIN (6 digits)</Label>
           <Input type="password" inputMode="numeric" maxLength={6} value={pin}
@@ -107,7 +107,7 @@ function PinForm() {
           <Input type="password" inputMode="numeric" maxLength={6} value={confirm}
             onChange={e => setConfirm(e.target.value.replace(/\D/g, ''))} placeholder="Confirm new PIN" />
           {msg && <p className={msg.ok ? 'text-sm text-green-600' : 'text-sm text-destructive'}>{msg.text}</p>}
-          <Button type="submit" disabled={pending || pin.length !== 6}>{pending ? 'Saving…' : 'Change PIN'}</Button>
+          <Button className="w-full sm:w-auto" type="submit" disabled={pending || pin.length !== 6}>{pending ? 'Saving…' : 'Change PIN'}</Button>
         </form>
       </CardContent>
     </Card>

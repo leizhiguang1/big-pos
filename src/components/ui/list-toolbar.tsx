@@ -23,8 +23,8 @@ export function ListToolbar({
   children,
 }: ListToolbarProps) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
-      <div className="relative w-full max-w-sm">
+    <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center', className)}>
+      <div className="relative w-full sm:max-w-sm">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={value}
@@ -33,7 +33,7 @@ export function ListToolbar({
           className="pl-9"
         />
       </div>
-      {children && <div className="ml-auto flex items-center gap-2">{children}</div>}
+      {children && <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">{children}</div>}
     </div>
   )
 }

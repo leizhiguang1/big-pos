@@ -267,7 +267,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-dvh bg-background">
       {/* Desktop sidebar */}
       <aside className={cn('hidden flex-col bg-primary flex-shrink-0 transition-[width] duration-200 md:flex', sidebarCollapsed ? 'w-20' : 'w-64')}>
         <SidebarContent
@@ -287,7 +287,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={closeSidebar} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-primary shadow-xl z-50">
+          <aside className="absolute bottom-0 left-0 top-0 z-50 w-[min(18rem,calc(100vw-2rem))] bg-primary shadow-xl">
             <SidebarContent
               items={items}
               activeHref={activeHref}
@@ -305,7 +305,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-card border-b border-border">
+        <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
@@ -319,8 +319,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           />
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-7">
-          {children}
+        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 lg:p-6">
+          {/* App-wide tooltip context so any page (settings managers, etc.) can use
+              Tooltip-based controls without each one re-declaring a provider. */}
+          <TooltipProvider delayDuration={200}>
+            {children}
+          </TooltipProvider>
         </main>
       </div>
 

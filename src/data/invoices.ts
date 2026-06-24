@@ -19,8 +19,8 @@ import type {
   WorkStage,
   WorkStatusConfig,
 } from '@/lib/database.types'
-import { isVoided, isOverdue } from '@/lib/invoice-status'
-import { todayISODate } from '@/lib/utils'
+import { isVoided } from '@/lib/invoice-status'
+import { getBillingSettings } from '@/data/billing-settings'
 import { paginate } from '@/lib/pagination'
 
 // --- Return types ----------------------------------------------------------
@@ -55,6 +55,8 @@ export type InvoiceFormData = {
   customers: Customer[]
   products: Product[]
   serviceStatuses: ServiceStatus[]
+  /** Lab's standard payment terms (days) — derives a new invoice's due date. */
+  paymentTermsDays: number
 }
 
 // Edit-mode prefill: the invoice header + its line items.
@@ -79,7 +81,7 @@ export async function getInvoices(): Promise<InvoiceListRow[]> {
 
 // --- Paginated list (URL-driven) -------------------------------------------
 
-export type InvoiceView = 'all' | 'drafts' | 'unpaid' | 'overdue' | 'voided'
+export type InvoiceView = 'all' | 'drafts' | 'unpaid' | 'voided'
 
 export interface InvoiceListParams {
   q?: string
@@ -111,29 +113,17 @@ const INVOICE_SORTERS: Record<string, (r: InvoiceListRow) => string | number> = 
   amount: r => Number(r.total),
 }
 
-// Plain-status / voided views push cheaply into SQL; `overdue` depends on
-// today, so it runs as a JS predicate over the fetched, cheap-filtered rows.
-// Work status is tracked per service item, never rolled up to the invoice, so
-// there are no work-based invoice views.
-function matchesDerivedView(inv: InvoiceListRow, view: InvoiceView, today: string): boolean {
-  switch (view) {
-    case 'overdue':
-      return isOverdue(inv, today)
-    default:
-      return true
-  }
-}
-
 /**
  * URL-driven invoices list: server-side search + view filter + sort, paginated.
- * Cheap filters (search, plain status, voided) go into the query; the derived
- * views and the sort run in JS over the fetched rows (tiny dataset, and several
- * predicates can't be expressed in one SQL query against the item rollup).
+ * The view filters (plain status, voided) push into SQL; only the clinic-name
+ * search and the sort run in JS over the fetched rows (tiny dataset, and the
+ * clinic name lives on an embedded relation an `.or()` can't reach).
+ * Work status is tracked per service item, never rolled up to the invoice, so
+ * there are no work-based invoice views.
  */
 export async function getInvoicesPage(params: InvoiceListParams = {}): Promise<InvoiceListPage> {
   const { q = '', view = 'all', page = 1, pageSize = 15, sort = null, dir = 'asc' } = params
   const supabase = await createClient()
-  const today = todayISODate()
 
   let query = supabase
     .from('invoices')
@@ -174,11 +164,6 @@ export async function getInvoicesPage(params: InvoiceListParams = {}): Promise<I
     )
   }
 
-  // Derived views → JS predicate.
-  if (view === 'overdue') {
-    rows = rows.filter(inv => matchesDerivedView(inv, view, today))
-  }
-
   // Sort → JS (default ordering is the SQL created_at desc above).
   const sorter = sort ? INVOICE_SORTERS[sort] : undefined
   if (sorter) {
@@ -209,7 +194,6 @@ export async function getInvoicesPage(params: InvoiceListParams = {}): Promise<I
  */
 export async function getInvoiceViewCounts(): Promise<Record<InvoiceView, number>> {
   const supabase = await createClient()
-  const today = todayISODate()
   const { data } = await supabase
     .from('invoices')
     .select('*, customers(clinic_name), service_statuses(*)')
@@ -218,7 +202,6 @@ export async function getInvoiceViewCounts(): Promise<Record<InvoiceView, number
     all: all.length,
     drafts: all.filter(i => !isVoided(i) && i.status === 'draft').length,
     unpaid: all.filter(i => !isVoided(i) && ['sent', 'partial', 'overdue'].includes(i.status)).length,
-    overdue: all.filter(i => isOverdue(i, today)).length,
     voided: all.filter(i => isVoided(i)).length,
   }
 }
@@ -283,15 +266,17 @@ export async function getWorkStatusConfigs(): Promise<WorkStatusConfig[]> {
 //   active service statuses.
 export async function getInvoiceFormData(): Promise<InvoiceFormData> {
   const supabase = await createClient()
-  const [cRes, pRes, ssRes] = await Promise.all([
+  const [cRes, pRes, ssRes, billingSettings] = await Promise.all([
     supabase.from('customers').select('*').order('clinic_name'),
     supabase.from('products').select('*').eq('active', true).order('created_at'),
     supabase.from('service_statuses').select('*').eq('is_active', true).order('sort_order').order('label'),
+    getBillingSettings(),
   ])
   return {
     customers: (cRes.data ?? []) as Customer[],
     products: (pRes.data ?? []) as Product[],
     serviceStatuses: (ssRes.data ?? []) as ServiceStatus[],
+    paymentTermsDays: billingSettings.paymentTermsDays,
   }
 }
 

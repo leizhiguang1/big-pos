@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Pencil, ToggleLeft, ToggleRight, ArrowUp, ArrowDown } from 'lucide-react'
+import { ActiveSwitch, TableActionButton } from '@/components/ui/table-actions'
+import { ArrowDown, ArrowUp, PencilLine, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { WorkStage } from '@/lib/database.types'
 import { COLOR_PRESETS, DEFAULT_COLOR } from '@/lib/service-status'
@@ -111,26 +112,26 @@ export default function WorkStagesPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full max-w-4xl space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">In-Progress Stages</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Sub-steps shown inside the In Progress work status.</p>
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">In-Progress Stages</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Sub-statuses of &ldquo;In Progress&rdquo;. The order here is display order only &mdash; it does not mean a case must move through them in sequence.</p>
           </div>
         </div>
-        {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Stage</Button>}
+        {canEdit && <Button className="w-full sm:w-auto" onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Stage</Button>}
       </div>
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[34rem]">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-24">Order</TableHead>
+                <TableHead className="w-24">Display order</TableHead>
                 <TableHead>Label</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-20"></TableHead>
+                <TableHead className="w-28"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -141,12 +142,8 @@ export default function WorkStagesPage() {
                   <TableCell>
                     {canEdit && (
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" disabled={i === 0} onClick={() => move(i, -1)}>
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </Button>
+                        <TableActionButton label="Move up" icon={ArrowUp} disabled={i === 0} onClick={() => move(i, -1)} />
+                        <TableActionButton label="Move down" icon={ArrowDown} disabled={i === rows.length - 1} onClick={() => move(i, 1)} />
                       </div>
                     )}
                   </TableCell>
@@ -158,13 +155,14 @@ export default function WorkStagesPage() {
                   <TableCell className="text-sm text-muted-foreground">{s.is_active ? 'Active' : 'Inactive'}</TableCell>
                   <TableCell>
                     {canEdit && (
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(s)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleActive(s)}>
-                          {s.is_active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
-                        </Button>
+                      <div className="flex items-center gap-2">
+                        <TableActionButton label="Edit work stage" icon={PencilLine} tone="primary" onClick={() => openEdit(s)} />
+                        <ActiveSwitch
+                          checked={s.is_active}
+                          onCheckedChange={() => toggleActive(s)}
+                          activeLabel="Active"
+                          inactiveLabel="Inactive"
+                        />
                       </div>
                     )}
                   </TableCell>
@@ -183,12 +181,12 @@ export default function WorkStagesPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label>Label *</Label>
-              <Input placeholder="e.g. Try-in" {...register('label')} />
+              <Input placeholder="e.g. Try In" {...register('label')} />
               {errors.label && <p className="text-xs text-destructive">{errors.label.message}</p>}
             </div>
             <div className="space-y-2">
               <Label>Color</Label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {COLOR_PRESETS.map(c => (
                   <button
                     key={c.value}

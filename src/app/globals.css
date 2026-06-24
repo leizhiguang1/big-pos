@@ -144,7 +144,7 @@
     display: none !important;
   }
 
-  /* Print only the invoice/delivery note document. Everything else on the page
+  /* Print only the invoice/delivery order document. Everything else on the page
      (action bar cards, work status, etc.) AND any open Radix dialogs/overlays
      that are still in the DOM during the exit animation get hidden via the
      visibility trick. position:absolute pulls #invoice-print to the top-left

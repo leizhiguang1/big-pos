@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Pencil } from 'lucide-react'
+import { PencilLine } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TableActionButton } from '@/components/ui/table-actions'
 import { cn } from '@/lib/utils'
 import { COLOR_PRESETS } from '@/lib/service-status'
 import { DEFAULT_WORK_STATUS_CONFIGS, workStatusDisplays, type WorkStatusDisplay } from '@/lib/work-status-config'
@@ -77,11 +78,11 @@ export default function WorkStatusesPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full max-w-4xl space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Work Statuses</h1>
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">Work Statuses</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Labels and colors for the fixed production flow.</p>
           </div>
         </div>
@@ -89,7 +90,7 @@ export default function WorkStatusesPage() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[32rem]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-40">System key</TableHead>
@@ -109,9 +110,7 @@ export default function WorkStatusesPage() {
                   </TableCell>
                   <TableCell>
                     {canEdit && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(row)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
+                      <TableActionButton label="Edit work status" icon={PencilLine} tone="primary" onClick={() => openEdit(row)} />
                     )}
                   </TableCell>
                 </TableRow>
@@ -138,7 +137,7 @@ export default function WorkStatusesPage() {
             </div>
             <div className="space-y-2">
               <Label>Color</Label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {COLOR_PRESETS.map(c => (
                   <button
                     key={c.value}

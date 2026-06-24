@@ -4,7 +4,7 @@
 // Two tiers:
 //  - Operational data modules (invoices, customers, products): `view` gates
 //    seeing the section, `edit` gates create/edit/delete. Invoices add `manage`
-//    for the powerful actions (void/restore + editing already-sent invoices).
+//    for the powerful actions (void + editing already-sent invoices).
 //  - Administration toggles: `reports.view` (view-only), `staff.manage`
 //    (employees), and `settings.manage` (all lab configuration — Service
 //    Statuses, Work Stages, and future business settings). Role management is
@@ -45,7 +45,7 @@ export const PERMISSION_GROUPS: {
     permissions: [
       { key: 'invoices.view', label: 'View invoices', description: 'See invoices and their line items.' },
       { key: 'invoices.edit', label: 'Create & edit draft invoices', description: 'Make new invoices and edit ones still in draft.' },
-      { key: 'invoices.manage', label: 'Void, restore & edit sent invoices', description: 'Powerful actions on invoices already sent to a doctor.' },
+      { key: 'invoices.manage', label: 'Void & edit sent invoices', description: 'Powerful actions on invoices already sent to a doctor.' },
     ],
   },
   {

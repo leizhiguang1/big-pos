@@ -4,7 +4,7 @@ import {
   encodeWork, decodeWork, workOptions, workOptionsForItem,
   workLabel, workColor, labelForValue, colorForValue,
   orderedGroupKeys, STAGE_DEFAULT_COLOR,
-  stageProgress, dotColorClass, nextWorkStep, workLabelWithPosition,
+  dotColorClass, nextWorkStep, workSubStatusLabel,
   matchesWorkFilter,
 } from '@/lib/work-stages'
 import { WORK_STATUS_LABELS, WORK_STATUS_COLORS } from '@/lib/work-status'
@@ -113,21 +113,6 @@ describe('orderedGroupKeys', () => {
   })
 })
 
-describe('stageProgress', () => {
-  it('returns null for any non-in-progress status', () => {
-    for (const ws of ['received', 'ready', 'delivered', 'on_hold'] as WorkStatus[]) {
-      expect(stageProgress(active, ws, null)).toBeNull()
-    }
-  })
-  it('gives the 0-based index + total for a staged in-progress item', () => {
-    expect(stageProgress(active, 'in_progress', 's1')).toEqual({ index: 0, total: 2 })
-    expect(stageProgress(active, 'in_progress', 's2')).toEqual({ index: 1, total: 2 })
-  })
-  it('is indeterminate (index -1) for bare in-progress or a retired/unknown stage', () => {
-    expect(stageProgress(active, 'in_progress', null)).toEqual({ index: -1, total: 2 })
-    expect(stageProgress(active, 'in_progress', 'gone')).toEqual({ index: -1, total: 2 })
-  })
-})
 
 describe('dotColorClass', () => {
   it('derives a saturated dot from a pale pill class', () => {
@@ -143,48 +128,36 @@ describe('dotColorClass', () => {
 })
 
 describe('nextWorkStep', () => {
-  it('received -> first active stage', () => {
-    expect(nextWorkStep(active, 'received', null)).toEqual({ work_status: 'in_progress', stage_id: 's1' })
+  it('received advances to bare in_progress (sub-status is picked explicitly)', () => {
+    expect(nextWorkStep('received')).toEqual({ work_status: 'in_progress', stage_id: null })
   })
-  it('received with no stages -> bare in_progress', () => {
-    expect(nextWorkStep([], 'received', null)).toEqual({ work_status: 'in_progress', stage_id: null })
+  it('in_progress advances straight to ready, regardless of stage', () => {
+    expect(nextWorkStep('in_progress')).toEqual({ work_status: 'ready', stage_id: null })
   })
-  it('staged in_progress -> next stage', () => {
-    expect(nextWorkStep(active, 'in_progress', 's1')).toEqual({ work_status: 'in_progress', stage_id: 's2' })
+  it('ready advances to delivered', () => {
+    expect(nextWorkStep('ready')).toEqual({ work_status: 'delivered', stage_id: null })
   })
-  it('last stage -> ready', () => {
-    expect(nextWorkStep(active, 'in_progress', 's2')).toEqual({ work_status: 'ready', stage_id: null })
+  it('delivered has no next step', () => {
+    expect(nextWorkStep('delivered')).toBeNull()
   })
-  it('bare in_progress -> first stage', () => {
-    expect(nextWorkStep(active, 'in_progress', null)).toEqual({ work_status: 'in_progress', stage_id: 's1' })
-  })
-  it('in_progress with no stages configured -> ready', () => {
-    expect(nextWorkStep([], 'in_progress', null)).toEqual({ work_status: 'ready', stage_id: null })
-  })
-  it('unknown/retired stage -> first stage', () => {
-    expect(nextWorkStep(active, 'in_progress', 'gone')).toEqual({ work_status: 'in_progress', stage_id: 's1' })
-  })
-  it('ready -> delivered', () => {
-    expect(nextWorkStep(active, 'ready', null)).toEqual({ work_status: 'delivered', stage_id: null })
-  })
-  it('delivered -> null', () => {
-    expect(nextWorkStep(active, 'delivered', null)).toBeNull()
-  })
-  it('on_hold -> null (Resume handles it)', () => {
-    expect(nextWorkStep(active, 'on_hold', null)).toBeNull()
+  it('on_hold has no next step (Resume covers it)', () => {
+    expect(nextWorkStep('on_hold')).toBeNull()
   })
 })
 
-describe('workLabelWithPosition', () => {
-  it('appends the 1-based position for a staged in-progress item', () => {
-    expect(workLabelWithPosition(active, 'in_progress', 's1', byId)).toBe('Custom Tray · 1/2')
-    expect(workLabelWithPosition(active, 'in_progress', 's2', byId)).toBe('Try-in · 2/2')
+describe('workSubStatusLabel', () => {
+  it('labels a staged in-progress item as "In Progress · <stage>"', () => {
+    expect(workSubStatusLabel('in_progress', 's1', byId)).toBe(`${WORK_STATUS_LABELS.in_progress} · Custom Tray`)
+    expect(workSubStatusLabel('in_progress', 's2', byId)).toBe(`${WORK_STATUS_LABELS.in_progress} · Try-in`)
   })
-  it('shows the plain In Progress label for a bare in-progress item', () => {
-    expect(workLabelWithPosition(active, 'in_progress', null, byId)).toBe(WORK_STATUS_LABELS.in_progress)
+  it('labels a bare in-progress item as the plain In Progress label', () => {
+    expect(workSubStatusLabel('in_progress', null, byId)).toBe(WORK_STATUS_LABELS.in_progress)
   })
-  it('shows the plain label for non-in-progress statuses', () => {
-    expect(workLabelWithPosition(active, 'ready', null, byId)).toBe(WORK_STATUS_LABELS.ready)
+  it('falls back to the plain label for an unknown/retired stage', () => {
+    expect(workSubStatusLabel('in_progress', 'gone', byId)).toBe(WORK_STATUS_LABELS.in_progress)
+  })
+  it('uses the plain work label for non-in-progress statuses', () => {
+    expect(workSubStatusLabel('ready', null, byId)).toBe(WORK_STATUS_LABELS.ready)
   })
 })
 

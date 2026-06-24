@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
-import { ArrowLeft, Plus, Pencil, KeyRound, UserCheck, UserX, Trash2 } from 'lucide-react'
+import { ActiveSwitch, TableActionButton } from '@/components/ui/table-actions'
+import { ArrowLeft, KeyRound, PencilLine, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Profile, Role } from '@/lib/database.types'
 import { createEmployee, updateEmployee, resetPin, setActive, deleteEmployee } from '@/lib/auth/employee-actions'
@@ -80,8 +81,8 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full max-w-4xl space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -92,23 +93,23 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
             <TooltipContent>Back to Settings</TooltipContent>
           </Tooltip>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Employees</h1>
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">Employees</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Add staff logins, reset PINs, and manage access.</p>
           </div>
         </div>
-        <Button onClick={() => setDialog({ mode: 'create' })}><Plus className="h-4 w-4 mr-2" />Add Employee</Button>
+        <Button className="w-full sm:w-auto" onClick={() => setDialog({ mode: 'create' })}><Plus className="h-4 w-4 mr-2" />Add Employee</Button>
       </div>
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[46rem]">
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>User ID</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-36 text-right">Actions</TableHead>
+                <TableHead className="w-44 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -138,35 +139,24 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
                     </span>
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <TipButton label="Edit name & role" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDialog({ mode: 'edit', employee: p })}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </TipButton>
-                      <TipButton label="Reset PIN" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDialog({ mode: 'resetPin', employee: p })}>
-                        <KeyRound className="h-3.5 w-3.5" />
-                      </TipButton>
-                      <TipButton
-                        label={p.id === currentUserId ? 'You cannot deactivate yourself' : p.active ? 'Deactivate (block sign-in)' : 'Reactivate'}
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
+                    <div className="flex items-center justify-end gap-2">
+                      <TableActionButton label="Edit name and role" icon={PencilLine} tone="primary" onClick={() => setDialog({ mode: 'edit', employee: p })} />
+                      <TableActionButton label="Reset PIN" icon={KeyRound} onClick={() => setDialog({ mode: 'resetPin', employee: p })} />
+                      <ActiveSwitch
+                        checked={p.active}
+                        onCheckedChange={() => toggleActive(p)}
                         disabled={p.id === currentUserId || busyId === p.id}
-                        onClick={() => toggleActive(p)}
-                      >
-                        {p.active
-                          ? <UserX className="h-4 w-4 text-red-500" />
-                          : <UserCheck className="h-4 w-4 text-green-600" />}
-                      </TipButton>
-                      <TipButton
+                        activeLabel="Can sign in"
+                        inactiveLabel="Blocked"
+                        tooltip={p.id === currentUserId ? 'You cannot deactivate yourself' : p.active ? 'Block sign-in' : 'Allow sign-in'}
+                      />
+                      <TableActionButton
                         label={p.id === currentUserId ? 'You cannot delete yourself' : 'Delete permanently'}
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
+                        icon={Trash2}
+                        tone="danger"
                         disabled={p.id === currentUserId || busyId === p.id}
                         onClick={() => remove(p)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </TipButton>
+                      />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -187,25 +177,6 @@ export default function EmployeesManager({ currentUserId }: { currentUserId: str
       )}
     </div>
     </TooltipProvider>
-  )
-}
-
-// Icon button with a hover tooltip. The span wrapper lets the tooltip show even
-// when the button is disabled (a disabled button swallows pointer events).
-function TipButton({
-  label,
-  children,
-  ...props
-}: React.ComponentProps<typeof Button> & { label: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="inline-flex">
-          <Button {...props}>{children}</Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
   )
 }
 

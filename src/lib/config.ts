@@ -18,10 +18,13 @@ export const BANK = {
   paymentNote: 'Please use invoice number as payment reference',
 }
 
-// The lab's standard payment terms (days). Auto-fills a new invoice's due date
-// (invoice date + this), and is the fallback the printed invoice shows when an
-// invoice has no due date to derive the term from. Per-invoice exceptions are
-// handled by editing the due date directly — terms aren't stored per clinic.
+export const BILLING_SETTINGS_ID = 'default'
+
+// The lab's standard payment terms (days). The invoice no longer captures a due
+// date in the UI; instead every invoice's due_date is derived as invoice date +
+// this (the column is NOT NULL and feeds A/R aging), and the printed invoice
+// shows this as the "Payment Terms" line. A future per-clinic/global setting can
+// replace this constant without reintroducing the due-date field.
 export const DEFAULT_PAYMENT_TERMS_DAYS = 30
 
 // Standing notes printed at the foot of every invoice (right of the bank
@@ -29,3 +32,16 @@ export const DEFAULT_PAYMENT_TERMS_DAYS = 30
 export const INVOICE_NOTES = [
   'Goods sold are neither returnable nor refundable.',
 ]
+
+export type BillingSettings = typeof BANK & {
+  invoiceNotes: string[]
+  // The lab's standard payment terms (days). Configurable in Settings → Billing;
+  // derives every NEW invoice's due_date (invoice_date + this).
+  paymentTermsDays: number
+}
+
+export const DEFAULT_BILLING_SETTINGS: BillingSettings = {
+  ...BANK,
+  invoiceNotes: INVOICE_NOTES,
+  paymentTermsDays: DEFAULT_PAYMENT_TERMS_DAYS,
+}

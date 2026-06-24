@@ -41,11 +41,11 @@ export const creditInputSchema = z.object({
 export const customerInputSchema = z.object({
   clinic_name: z.string().min(1, 'Clinic name is required'),
   ssm_no: z.string().optional(),
-  contact_person: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.email('Invalid email').optional().or(z.literal('')),
-  billing_address: z.string().optional(),
-  delivery_address: z.string().optional(),
+  contact_person: z.string().min(1, 'Contact person is required'),
+  phone: z.string().min(1, 'Phone is required'),
+  email: z.string().min(1, 'Email is required').pipe(z.email('Invalid email')),
+  billing_address: z.string().min(1, 'Billing address is required'),
+  delivery_address: z.string().min(1, 'Delivery address is required'),
   notes: z.string().optional(),
 })
 export const productInputSchema = z

@@ -71,7 +71,7 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-2xl pb-12">
+    <form onSubmit={handleSubmit(onSubmit)} className="mx-auto w-full max-w-2xl pb-12">
       {/* Sticky header: labeled back link + primary actions always in reach. */}
       <div className="sticky top-0 z-10 border-b border-border bg-background py-4">
         <Link
@@ -83,10 +83,10 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
         </Link>
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{isEdit ? 'Edit Clinic' : 'New Clinic'}</h1>
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">{isEdit ? 'Edit Clinic' : 'New Clinic'}</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">Dental clinic or dentist details</p>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
             <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
             <Button type="submit" disabled={saving || !canEdit}>
               {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Clinic'}
@@ -95,8 +95,8 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
         </div>
       </div>
 
-      <div className="space-y-5 pt-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-4 pt-5">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="clinic_name">Clinic / Business Name *</Label>
             <Input id="clinic_name" placeholder="e.g. Klinik Gigi Sehat" {...register('clinic_name')} />
@@ -109,13 +109,14 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="contact_person">Contact Person (Dr. Name)</Label>
+          <Label htmlFor="contact_person">Contact Person (Dr. Name) *</Label>
           <Input id="contact_person" placeholder="e.g. Dr. Ahmad bin Ali" {...register('contact_person')} />
+          {errors.contact_person && <p className="text-xs text-destructive">{errors.contact_person.message}</p>}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone</Label>
+            <Label htmlFor="phone">Phone *</Label>
             <Controller
               name="phone"
               control={control}
@@ -123,32 +124,35 @@ export default function CustomerForm({ initialData }: { initialData?: Customer }
                 <PhoneInput id="phone" value={field.value ?? ''} onChange={field.onChange} />
               )}
             />
+            {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email *</Label>
             <Input id="email" type="email" placeholder="clinic@example.com" {...register('email')} />
             {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="billing_address">Billing Address</Label>
+            <Label htmlFor="billing_address">Billing Address *</Label>
             <Textarea
               id="billing_address"
               placeholder="Address for invoice billing…"
               rows={4}
               {...register('billing_address')}
             />
+            {errors.billing_address && <p className="text-xs text-destructive">{errors.billing_address.message}</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="delivery_address">Delivery Address</Label>
+            <Label htmlFor="delivery_address">Delivery Address *</Label>
             <Textarea
               id="delivery_address"
               placeholder="Address for lab work delivery…"
               rows={4}
               {...register('delivery_address')}
             />
+            {errors.delivery_address && <p className="text-xs text-destructive">{errors.delivery_address.message}</p>}
           </div>
         </div>
 

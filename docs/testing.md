@@ -85,4 +85,4 @@ security). Still open:
 - **Tier 3 — interactive components & E2E**: the role editor's
   permission-dependency logic and last-superadmin guard, the invoice form, the
   work queue, and a Playwright smoke of login → invoice → payment → work-status
-  → void/restore.
+  → void.

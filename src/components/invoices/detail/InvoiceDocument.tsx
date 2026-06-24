@@ -19,13 +19,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { ServiceStatusSelectItem } from '@/components/invoices/ServiceStatusSelectItem'
+import { ManageOptionsLink } from '@/components/ui/manage-options-link'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Printer, Pencil, Plus, Trash2 } from 'lucide-react'
 import { isVoided } from '@/lib/invoice-status'
 import { saveRecipientAction } from '@/data/invoice-actions'
 import type { InvoiceItem, Product, ServiceStatus, WorkStage, WorkStatusConfig } from '@/lib/database.types'
 import type { InvoiceDetail } from '@/data/invoices'
-import { COMPANY, BANK, INVOICE_NOTES, DEFAULT_PAYMENT_TERMS_DAYS } from '@/lib/config'
+import { COMPANY, type BillingSettings } from '@/lib/config'
+import { paymentDetailsForInvoice } from '@/lib/billing-settings'
 import { DEFAULT_COLOR } from '@/lib/service-status'
 import { workLabel, workColor } from '@/lib/work-stages'
 
@@ -47,7 +49,6 @@ type PrintLineItem = {
 
 type PrintOverrides = {
   date: string
-  dueDate: string
   billToName: string
   billToContact: string
   billToPhone: string
@@ -72,6 +73,7 @@ export type InvoiceDocumentProps = {
   stages: WorkStage[]
   workStatusConfigs: WorkStatusConfig[]
   totalPaid: number
+  billingSettings: BillingSettings
   /** Whether the recipient edit pencil is interactive (canEdit && !voided). */
   canEdit: boolean
   /** Receives the imperative print-dialog opener so the actions bar can trigger it. */
@@ -87,6 +89,7 @@ export function InvoiceDocument({
   stages,
   workStatusConfigs,
   totalPaid,
+  billingSettings,
   canEdit,
   onPrintReady,
 }: InvoiceDocumentProps) {
@@ -97,6 +100,7 @@ export function InvoiceDocument({
   const newLineId = useRef(0)
   // Labels per-item work status on the work ticket (handles in-progress stages).
   const stagesById = new Map(stages.map(s => [s.id, s]))
+  const paymentDetails = paymentDetailsForInvoice(invoice, billingSettings)
 
   // Print state (no persistence — overrides apply to the printout only).
   const [printMode, setPrintMode] = useState<PrintMode>('invoice')
@@ -121,7 +125,7 @@ export function InvoiceDocument({
   const openPrintDialog = (mode: PrintMode) => {
     // The bench work ticket has no money/recipient fields to override, so it
     // skips the preview-and-edit dialog and prints the case as-is. The override
-    // editor only makes sense for the customer-facing invoice / delivery note.
+    // editor only makes sense for the customer-facing invoice / delivery order.
     if (mode === 'work_ticket') {
       setPrintOverrides(null)
       setPrintMode('work_ticket')
@@ -131,7 +135,6 @@ export function InvoiceDocument({
     setDialogMode(mode)
     setPrintDraft({
       date: invoice.invoice_date,
-      dueDate: invoice.due_date ?? '',
       billToName: invoice.bill_to_name ?? '',
       billToContact: invoice.bill_to_contact ?? '',
       billToPhone: invoice.bill_to_phone ?? '',
@@ -238,30 +241,15 @@ export function InvoiceDocument({
           amount: Number(it.quantity) * Number(it.unit_price),
           productDescription: productDescriptionFor(it.product_id ?? null),
         }))
-    // Subtotal = sum of (possibly overridden) line amounts. Apply the saved
-    // invoice discount_pct to keep the printed Subtotal / Discount / Total
-    // consistent when line items are overridden in the print dialog. With no
-    // overrides we use the stored values verbatim.
-    const discountPct = Number(invoice.discount_pct ?? 0)
-    const taxRate = Number(invoice.tax_rate ?? 0)
-    const previewSubtotal = o
+    // Total = sum of (possibly overridden) line amounts; with no overrides we use
+    // the stored invoice total verbatim. Discount and SST tax have been removed
+    // from the product, so there is no Subtotal/Discount/Tax breakdown.
+    const previewTotal = o
       ? lines.reduce((sum, l) => sum + l.amount, 0)
-      : Number(invoice.subtotal ?? invoice.total)
-    const previewDiscount = o
-      ? Math.round(previewSubtotal * discountPct) / 100
-      : Number(invoice.discount_amount ?? 0)
-    // SST tax (Wave 5) applies AFTER discount, on the discounted (taxable) amount —
-    // same subtotal→discount→tax→total order as the invoice form. With no overrides
-    // we use the stored tax_amount verbatim.
-    const previewTaxable = previewSubtotal - previewDiscount
-    const previewTax = o
-      ? Math.round(previewTaxable * taxRate) / 100
-      : Number(invoice.tax_amount ?? 0)
-    const previewTotal = o ? previewTaxable + previewTax : Number(invoice.total)
+      : Number(invoice.total)
     return {
       field: {
         date:            o ? o.date            : invoice.invoice_date,
-        dueDate:         o ? o.dueDate         : invoice.due_date,
         billToName:      o ? o.billToName      : invoice.bill_to_name,
         billToContact:   o ? o.billToContact   : invoice.bill_to_contact,
         billToPhone:     o ? o.billToPhone     : invoice.bill_to_phone,
@@ -276,11 +264,6 @@ export function InvoiceDocument({
         ? (serviceStatuses.find(s => s.id === o.serviceStatusId) ?? null)
         : currentServiceStatus,
       lines,
-      previewSubtotal,
-      previewDiscount,
-      previewDiscountPct: discountPct,
-      previewTax,
-      previewTaxRate: taxRate,
       previewTotal,
       instructions: o?.instructions ?? '',
     }
@@ -292,17 +275,18 @@ export function InvoiceDocument({
     showInlineEdit: boolean
   }) => {
     const { mode, resolved, showInlineEdit } = opts
-    const { field, serviceStatusForPrint, lines, previewSubtotal, previewDiscount, previewDiscountPct, previewTax, previewTaxRate, previewTotal, instructions } = resolved
-    // Subtotal breakdown prints when EITHER a discount or tax applies; an invoice
-    // with neither keeps the original single Total row.
-    const hasAdjustments = previewDiscount > 0 || previewTax > 0
+    const { field, serviceStatusForPrint, lines, previewTotal, instructions } = resolved
     const isDelivery = mode === 'delivery'
-    // Payment terms = the gap between the invoice date and its (possibly
-    // overridden) due date, so the printed term always matches the dates on the
-    // same page. Falls back to the lab default when no due date is set.
-    const paymentTermsDays = field.dueDate
-      ? Math.max(0, Math.round((new Date(field.dueDate).getTime() - new Date(field.date).getTime()) / 86_400_000))
-      : DEFAULT_PAYMENT_TERMS_DAYS
+    // Deliver To is captured on every invoice (seeded from the clinic). We always
+    // print it as its own column when any ship-to detail exists — even when it is
+    // identical to Bill To, it simply duplicates. (Legacy invoices with no stored
+    // ship-to collapse to a single full-width Bill To block.)
+    const norm = (v: string | null | undefined) => (v ?? '').trim()
+    const showDeliverTo = Boolean(norm(field.shipToName) || norm(field.shipToContact) || norm(field.deliveryAddress))
+    // Payment terms = the lab's standard term (days), from billing settings. The
+    // invoice no longer captures or prints a specific due date; only this terms
+    // line remains. (Terms aren't snapshotted per invoice — see paymentDetails.)
+    const paymentTermsDays = paymentDetails.paymentTermsDays
     return (
       <>
         {isVoided(invoice) && (
@@ -326,24 +310,21 @@ export function InvoiceDocument({
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold text-gray-200 uppercase tracking-widest mb-2">
-              {isDelivery ? 'Delivery Note' : 'Invoice'}
+              {isDelivery ? 'Delivery Order' : 'Invoice'}
             </div>
             <div className="text-sm space-y-1">
               <div>
-                <span className="text-gray-400">{isDelivery ? 'Order #: ' : 'Invoice #: '}</span>
-                <span className="font-semibold">{invoice.invoice_number}</span>
+                <span className="text-gray-400">{isDelivery ? 'D/O #: ' : 'Invoice #: '}</span>
+                <span className="font-semibold">{isDelivery ? invoice.delivery_order_number : invoice.invoice_number}</span>
               </div>
               <div><span className="text-gray-400">Date: </span>{formatDate(field.date)}</div>
-              {!isDelivery && field.dueDate && (
-                <div><span className="text-gray-400">Due: </span>{formatDate(field.dueDate)}</div>
-              )}
             </div>
           </div>
         </div>
 
         {/* Bill To / Deliver To + Case Details */}
         <div className="mb-8 flex flex-wrap gap-6 justify-between">
-          <div className={`grid gap-6 flex-1 ${field.deliveryAddress ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-6 flex-1 ${showDeliverTo ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="text-xs font-semibold uppercase tracking-wider text-gray-400">Bill To</div>
@@ -363,12 +344,12 @@ export function InvoiceDocument({
               {field.billingAddress && <div className="text-sm text-gray-500 whitespace-pre-line">{field.billingAddress}</div>}
               {field.billToPhone && <div className="text-sm text-gray-500">Tel: {field.billToPhone}</div>}
             </div>
-            {field.deliveryAddress && (
+            {showDeliverTo && (
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Deliver To</div>
                 {field.shipToName && <div className="font-semibold text-gray-900">{field.shipToName}</div>}
                 {field.shipToContact && <div className="text-sm text-gray-600">{field.shipToContact}</div>}
-                <div className="text-sm text-gray-500 whitespace-pre-line">{field.deliveryAddress}</div>
+                <div className="text-sm text-gray-500 whitespace-pre-line">{field.deliveryAddress || field.billingAddress}</div>
               </div>
             )}
           </div>
@@ -434,37 +415,9 @@ export function InvoiceDocument({
           </tbody>
           {!isDelivery && (
             <tfoot>
-              {/* Subtotal / Discount / Tax rows print only when an adjustment
-                  applies; an invoice with neither discount nor tax keeps the
-                  original single Total row. */}
-              {hasAdjustments && (
-                <>
-                  <tr>
-                    <td colSpan={3} className="pt-4 text-right text-gray-500">Subtotal</td>
-                    <td className="pt-4 text-right text-gray-700">{formatCurrency(previewSubtotal)}</td>
-                  </tr>
-                  {previewDiscount > 0 && (
-                    <tr>
-                      <td colSpan={3} className="pt-1 text-right text-gray-500">
-                        Discount{previewDiscountPct > 0 ? ` (${previewDiscountPct}%)` : ''}
-                      </td>
-                      <td className="pt-1 text-right text-gray-700">({formatCurrency(previewDiscount)})</td>
-                    </tr>
-                  )}
-                  {/* SST tax row (Wave 5) — between Discount and Total, only when tax applies. */}
-                  {previewTax > 0 && (
-                    <tr>
-                      <td colSpan={3} className="pt-1 text-right text-gray-500">
-                        SST{previewTaxRate > 0 ? ` (${previewTaxRate}%)` : ''}
-                      </td>
-                      <td className="pt-1 text-right text-gray-700">{formatCurrency(previewTax)}</td>
-                    </tr>
-                  )}
-                </>
-              )}
               <tr>
-                <td colSpan={3} className={cn('text-right font-semibold text-gray-700', hasAdjustments ? 'pt-1' : 'pt-4')}>Total</td>
-                <td className={cn('text-right text-lg font-bold text-gray-900', hasAdjustments ? 'pt-1' : 'pt-4')}>{formatCurrency(previewTotal)}</td>
+                <td colSpan={3} className="pt-4 text-right font-semibold text-gray-700">Total</td>
+                <td className="pt-4 text-right text-lg font-bold text-gray-900">{formatCurrency(previewTotal)}</td>
               </tr>
               {totalPaid > 0 && (
                 <>
@@ -491,20 +444,26 @@ export function InvoiceDocument({
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-3">Payment Details</div>
                   <div className="space-y-1 text-sm">
-                    <div><span className="text-gray-500">Bank: </span><span className="font-medium">{BANK.bankName}</span></div>
-                    <div><span className="text-gray-500">Account Name: </span><span className="font-medium">{BANK.accountName}</span></div>
-                    <div><span className="text-gray-500">Account No: </span><span className="font-medium font-mono">{BANK.accountNumber}</span></div>
+                    <div><span className="text-gray-500">Bank: </span><span className="font-medium">{paymentDetails.bankName}</span></div>
+                    <div><span className="text-gray-500">Account Name: </span><span className="font-medium">{paymentDetails.accountName}</span></div>
+                    <div><span className="text-gray-500">Account No: </span><span className="font-medium font-mono">{paymentDetails.accountNumber}</span></div>
                   </div>
-                  <p className="text-xs text-primary/60 mt-3 italic">{BANK.paymentNote}</p>
+                  {paymentDetails.paymentNote && (
+                    <p className="text-xs text-primary/60 mt-3 italic">{paymentDetails.paymentNote}</p>
+                  )}
                 </div>
                 {/* Right: payment terms + standing notes */}
                 <div className="text-sm">
                   <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Payment Terms</div>
                   <div className="font-medium text-gray-700 mb-3">{paymentTermsDays} Days</div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Note</div>
-                  <ol className="list-decimal list-inside text-gray-700 space-y-0.5">
-                    {INVOICE_NOTES.map((note, i) => <li key={i}>{note}</li>)}
-                  </ol>
+                  {paymentDetails.invoiceNotes.length > 0 && (
+                    <>
+                      <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Note</div>
+                      <ol className="list-decimal list-inside text-gray-700 space-y-0.5">
+                        {paymentDetails.invoiceNotes.map((note, i) => <li key={i}>{note}</li>)}
+                      </ol>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -520,9 +479,10 @@ export function InvoiceDocument({
         {isDelivery && (
           <div className="mt-16 flex justify-end text-sm">
             <div className="w-64">
-              <div className="text-gray-700 mb-1">Agreed &amp; Confirm by</div>
-              <div className="border-b border-gray-400 h-20" />
-              <div className="mt-2 text-xs text-gray-500">Signature / Stamp</div>
+              <div className="text-gray-700">Received above goods in Good Order and Condition.</div>
+              <div className="mt-6 text-gray-700">Received By:</div>
+              <div className="mt-12 border-b border-gray-400" />
+              <div className="mt-2 text-xs text-gray-500">Name, Signature, Date &amp; Company Stamp</div>
             </div>
           </div>
         )}
@@ -565,9 +525,6 @@ export function InvoiceDocument({
                 <span className="font-semibold">{invoice.invoice_number}</span>
               </div>
               <div><span className="text-gray-400">Date: </span>{formatDate(invoice.invoice_date)}</div>
-              {invoice.due_date && (
-                <div><span className="text-gray-400">Due: </span>{formatDate(invoice.due_date)}</div>
-              )}
             </div>
           </div>
         </div>
@@ -670,20 +627,20 @@ export function InvoiceDocument({
 
       {/* Unified print dialog — preview on left, editor on right */}
       <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
-        <DialogContent className="max-w-[1400px] w-[96vw] max-h-[94vh] p-0 gap-0 flex flex-col overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-3 border-b">
+        <DialogContent className="max-h-[94dvh] w-[96vw] max-w-[1400px] gap-0 overflow-hidden p-0 flex flex-col">
+          <DialogHeader className="border-b px-4 pb-3 pt-4 sm:px-6 sm:pt-5">
             <DialogTitle className="flex items-center gap-3">
               <Printer className="h-5 w-5 text-primary" />
-              {dialogMode === 'delivery' ? 'Print Delivery Note' : 'Print Invoice'}
+              {dialogMode === 'delivery' ? 'Print Delivery Order' : 'Print Invoice'}
             </DialogTitle>
             <p className="text-xs text-gray-500 mt-1">
               Preview on the left — adjust anything on the right, then print.
             </p>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] flex-1 overflow-hidden">
+          <div className="grid flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:overflow-hidden">
             {/* Live preview (LEFT) */}
-            <div className="overflow-auto bg-gray-100 px-6 py-4 border-r">
+            <div className="max-h-[42vh] overflow-auto border-r bg-gray-100 px-4 py-4 sm:px-6 lg:max-h-none">
               <div className="text-xs uppercase tracking-wider text-gray-500 mb-2 font-semibold">Preview</div>
               <div className="bg-white shadow-md mx-auto" style={{ width: '760px' }}>
                 <div className="relative p-8">
@@ -693,32 +650,20 @@ export function InvoiceDocument({
             </div>
 
             {/* Edit form (RIGHT) */}
-            <div className="overflow-y-auto px-6 py-4 bg-white">
+            <div className="overflow-y-auto bg-white px-4 py-4 sm:px-6">
               <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 mb-4">
                 These edits apply only to this printout. <strong>Nothing is saved</strong> to the invoice.
               </div>
 
               {printDraft && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-gray-500">Date</Label>
-                      <Input
-                        type="date"
-                        value={printDraft.date}
-                        onChange={e => setPrintDraft(d => d && ({ ...d, date: e.target.value }))}
-                      />
-                    </div>
-                    {dialogMode === 'invoice' && (
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-gray-500">Due date</Label>
-                        <Input
-                          type="date"
-                          value={printDraft.dueDate}
-                          onChange={e => setPrintDraft(d => d && ({ ...d, dueDate: e.target.value }))}
-                        />
-                      </div>
-                    )}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-500">Date</Label>
+                    <Input
+                      type="date"
+                      value={printDraft.date}
+                      onChange={e => setPrintDraft(d => d && ({ ...d, date: e.target.value }))}
+                    />
                   </div>
 
                   <fieldset className="border rounded-md p-3 space-y-2.5">
@@ -727,7 +672,7 @@ export function InvoiceDocument({
                       <Label className="text-xs text-gray-500">Clinic</Label>
                       <Input value={printDraft.billToName} onChange={e => setPrintDraft(d => d && ({ ...d, billToName: e.target.value }))} />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-gray-500">Contact person</Label>
                         <Input value={printDraft.billToContact} onChange={e => setPrintDraft(d => d && ({ ...d, billToContact: e.target.value }))} />
@@ -748,7 +693,7 @@ export function InvoiceDocument({
 
                   <fieldset className="border rounded-md p-3 space-y-2.5">
                     <legend className="text-xs font-semibold text-gray-500 px-1 uppercase tracking-wider">Deliver To</legend>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-gray-500">Clinic</Label>
                         <Input value={printDraft.shipToName} onChange={e => setPrintDraft(d => d && ({ ...d, shipToName: e.target.value }))} />
@@ -766,7 +711,7 @@ export function InvoiceDocument({
 
                   <fieldset className="border rounded-md p-3 space-y-2.5">
                     <legend className="text-xs font-semibold text-gray-500 px-1 uppercase tracking-wider">Case</legend>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-gray-500">Patient</Label>
                         <Input value={printDraft.patient} onChange={e => setPrintDraft(d => d && ({ ...d, patient: e.target.value }))} />
@@ -788,6 +733,7 @@ export function InvoiceDocument({
                           {serviceStatuses.map(s => (
                             <ServiceStatusSelectItem key={s.id} status={s} />
                           ))}
+                          <ManageOptionsLink href="/settings/service-statuses" label="Manage service statuses" />
                         </SelectContent>
                       </Select>
                     </div>
@@ -797,7 +743,7 @@ export function InvoiceDocument({
                     <legend className="text-xs font-semibold text-gray-500 px-1 uppercase tracking-wider">Line items</legend>
                     {printDraft.lineItems.length > 0 && (
                       <div className={cn(
-                        'grid items-center gap-2 text-[10px] uppercase tracking-wider text-gray-400 px-0.5',
+                        'hidden items-center gap-2 px-0.5 text-[10px] uppercase tracking-wider text-gray-400 sm:grid',
                         dialogMode === 'invoice'
                           ? 'grid-cols-[minmax(0,1fr)_60px_90px_32px]'
                           : 'grid-cols-[minmax(0,1fr)_60px_32px]',
@@ -822,10 +768,10 @@ export function InvoiceDocument({
                           }))
                         return (
                           <div key={li.id} className={cn(
-                            'grid items-center gap-2',
+                            'grid grid-cols-1 gap-2 sm:items-center',
                             dialogMode === 'invoice'
-                              ? 'grid-cols-[minmax(0,1fr)_60px_90px_32px]'
-                              : 'grid-cols-[minmax(0,1fr)_60px_32px]',
+                              ? 'sm:grid-cols-[minmax(0,1fr)_60px_90px_32px]'
+                              : 'sm:grid-cols-[minmax(0,1fr)_60px_32px]',
                           )}>
                             <Input
                               className="h-8 text-sm"
@@ -899,7 +845,7 @@ export function InvoiceDocument({
                   {dialogMode === 'delivery' && (
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-500">
-                        Delivery instructions <span className="text-gray-400 font-normal">(prints only on the delivery note)</span>
+                        Delivery instructions <span className="text-gray-400 font-normal">(prints only on the delivery order)</span>
                       </Label>
                       <Textarea
                         rows={2}
@@ -914,10 +860,10 @@ export function InvoiceDocument({
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t bg-white">
+          <DialogFooter className="border-t bg-white px-4 py-4 sm:px-6">
             <Button variant="outline" onClick={() => setPrintDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleConfirmPrint}>
-              <Printer className="h-4 w-4 mr-2" />Print {dialogMode === 'delivery' ? 'Delivery Note' : 'Invoice'}
+              <Printer className="h-4 w-4 mr-2" />Print {dialogMode === 'delivery' ? 'Delivery Order' : 'Invoice'}
             </Button>
           </DialogFooter>
         </DialogContent>

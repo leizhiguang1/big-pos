@@ -11,8 +11,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
-import { Plus, Pencil, ToggleLeft, ToggleRight, ArrowUp, ArrowDown } from 'lucide-react'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { ActiveSwitch, TableActionButton } from '@/components/ui/table-actions'
+import { ArrowDown, ArrowUp, PencilLine, Plus } from 'lucide-react'
 import type { Unit } from '@/lib/database.types'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -110,26 +111,26 @@ export default function UnitsPage() {
 
   return (
     <TooltipProvider delayDuration={200}>
-    <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="w-full max-w-4xl space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Units</h1>
+            <h1 className="text-xl font-bold text-foreground sm:text-2xl">Units</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Units of measure for products (per tooth, per arch, per case…).</p>
           </div>
         </div>
-        {canEdit && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Unit</Button>}
+        {canEdit && <Button className="w-full sm:w-auto" onClick={openNew}><Plus className="h-4 w-4 mr-2" />Add Unit</Button>}
       </div>
 
       <Card>
         <CardContent className="p-0">
-          <Table>
+          <Table className="min-w-[34rem]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-24">Order</TableHead>
                 <TableHead>Label</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-20"></TableHead>
+                <TableHead className="w-28"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -140,22 +141,8 @@ export default function UnitsPage() {
                   <TableCell>
                     {canEdit && (
                       <div className="flex gap-1">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}>
-                              <ArrowUp className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Move up</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Move down" disabled={i === rows.length - 1} onClick={() => move(i, 1)}>
-                              <ArrowDown className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Move down</TooltipContent>
-                        </Tooltip>
+                        <TableActionButton label="Move up" icon={ArrowUp} disabled={i === 0} onClick={() => move(i, -1)} />
+                        <TableActionButton label="Move down" icon={ArrowDown} disabled={i === rows.length - 1} onClick={() => move(i, 1)} />
                       </div>
                     )}
                   </TableCell>
@@ -163,23 +150,14 @@ export default function UnitsPage() {
                   <TableCell className="text-sm text-muted-foreground">{u.is_active ? 'Active' : 'Inactive'}</TableCell>
                   <TableCell>
                     {canEdit && (
-                      <div className="flex gap-1">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit unit" onClick={() => openEdit(u)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Edit unit</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={u.is_active ? 'Deactivate unit' : 'Activate unit'} onClick={() => toggleActive(u)}>
-                              {u.is_active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{u.is_active ? 'Active — click to deactivate' : 'Inactive — click to activate'}</TooltipContent>
-                        </Tooltip>
+                      <div className="flex items-center gap-2">
+                        <TableActionButton label="Edit unit" icon={PencilLine} tone="primary" onClick={() => openEdit(u)} />
+                        <ActiveSwitch
+                          checked={u.is_active}
+                          onCheckedChange={() => toggleActive(u)}
+                          activeLabel="Active"
+                          inactiveLabel="Inactive"
+                        />
                       </div>
                     )}
                   </TableCell>

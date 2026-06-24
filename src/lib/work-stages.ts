@@ -127,20 +127,6 @@ export function orderedGroupKeys(activeStages: WorkStage[], present: string[]): 
   return out
 }
 
-// In-Progress substate position, for the stage stepper. Returns null unless the
-// item is in_progress. `index` is the 0-based position of `stage_id` among the
-// active stages, or -1 when the stage is missing/retired (indeterminate);
-// `total` is the active stage count.
-export type StageProgress = { index: number; total: number }
-export function stageProgress(
-  activeStages: WorkStage[],
-  work_status: WorkStatus,
-  stage_id: string | null,
-): StageProgress | null {
-  if (work_status !== 'in_progress') return null
-  const index = stage_id ? activeStages.findIndex(s => s.id === stage_id) : -1
-  return { index, total: activeStages.length }
-}
 
 // Derive a saturated dot color (`bg-<hue>-500`) from a pale pill class
 // (`bg-<hue>-100 text-<hue>-700`). Falls back to a neutral dot when no bg hue
@@ -150,26 +136,18 @@ export function dotColorClass(pillColor: string): string {
   return m ? `bg-${m[1]}-500` : 'bg-gray-400'
 }
 
-// Forward "advance" target for the one-click Advance action. Returns the next
-// (work_status, stage_id) in the linear flow, or null when there is no next step
-// (delivered, or on_hold which uses Resume instead).
+// Forward "advance" target for the one-click Advance action — TOP-LEVEL only.
+// Sub-stages are labeled sub-statuses, not a pipeline, so advancing never walks
+// stage→stage; received lands on BARE in_progress (the user then picks a sub-status).
+// Returns null when there is no next step (delivered; on_hold uses Resume instead).
 export function nextWorkStep(
-  activeStages: WorkStage[],
   work_status: WorkStatus,
-  stage_id: string | null,
 ): { work_status: WorkStatus; stage_id: string | null } | null {
   switch (work_status) {
     case 'received':
-      return activeStages.length > 0
-        ? { work_status: 'in_progress', stage_id: activeStages[0].id }
-        : { work_status: 'in_progress', stage_id: null }
-    case 'in_progress': {
-      if (activeStages.length === 0) return { work_status: 'ready', stage_id: null }
-      const i = stage_id ? activeStages.findIndex(s => s.id === stage_id) : -1
-      if (i === -1) return { work_status: 'in_progress', stage_id: activeStages[0].id }
-      if (i >= activeStages.length - 1) return { work_status: 'ready', stage_id: null }
-      return { work_status: 'in_progress', stage_id: activeStages[i + 1].id }
-    }
+      return { work_status: 'in_progress', stage_id: null }
+    case 'in_progress':
+      return { work_status: 'ready', stage_id: null }
     case 'ready':
       return { work_status: 'delivered', stage_id: null }
     default: // delivered, on_hold
@@ -177,19 +155,21 @@ export function nextWorkStep(
   }
 }
 
-// Label for the trigger pill / badge: appends the stepper position to a staged
-// in-progress item (e.g. "Try In · 2/4"); the plain work label otherwise.
-export function workLabelWithPosition(
-  activeStages: WorkStage[],
+// Label for the trigger pill / badge. A staged in-progress item reads as a
+// sub-status of In Progress: "In Progress · Try In". Bare in-progress and every
+// other status use their plain work label. (No position/count — stages are
+// labeled sub-statuses, not an ordered sequence.)
+export function workSubStatusLabel(
   work_status: WorkStatus,
   stage_id: string | null,
   stagesById: Map<string, WorkStage>,
   statusConfigs?: WorkStatusDisplay[],
 ): string {
-  const base = workLabel(work_status, stage_id, stagesById, statusConfigs)
-  const p = stageProgress(activeStages, work_status, stage_id)
-  if (p && p.index >= 0) return `${base} · ${p.index + 1}/${p.total}`
-  return base
+  if (work_status === 'in_progress' && stage_id) {
+    const s = stagesById.get(stage_id)
+    if (s) return `${workStatusLabel('in_progress', statusConfigs)} · ${s.label}`
+  }
+  return workLabel(work_status, stage_id, stagesById, statusConfigs)
 }
 
 // Work-queue filter predicate. `filter` is 'all' | 'active' | a WorkStatus | "stage:<id>".

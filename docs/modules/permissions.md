@@ -16,7 +16,7 @@ The permission system is a **fixed catalogue** of 12 capability keys. Users cann
 |---|---|
 | `invoices.view` | Open the Invoices section at all |
 | `invoices.edit` | Create and edit **draft** invoices |
-| `invoices.manage` | Void, restore, and edit **already-sent** invoices |
+| `invoices.manage` | Void and edit **already-sent** invoices |
 | `customers.view` | Open the Customers section |
 | `customers.edit` | Add and edit customers |
 | `products.view` | Open the Products section |
@@ -76,7 +76,7 @@ The following actions are gated server-side via `requirePermission` / `requireSu
 
 | Action | Guard |
 |---|---|
-| Invoice void / restore | `requirePermission('invoices.manage')` |
+| Invoice void | `requirePermission('invoices.manage')` |
 | Employee create / update / delete / reset PIN | `requirePermission('staff.manage')` |
 | Role create / update / delete | `requireSuperadmin()` |
 

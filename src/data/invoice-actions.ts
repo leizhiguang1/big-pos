@@ -57,11 +57,13 @@ import type { PermissionCheck } from '@/lib/auth/require-permission'
 import { isVoided } from '@/lib/invoice-status'
 import { hold } from '@/domain/production'
 import type { Json, TablesUpdate, WorkStatus } from '@/lib/database.types'
+import { getBillingSettings } from '@/data/billing-settings'
+import { invoiceSnapshotFromSettings } from '@/lib/billing-settings'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 export type CreateResult = { ok: true; id: string } | { ok: false; error: string }
 
-// Void/restore live in `@/lib/invoices/void-actions` — import them directly.
+// Void actions live in `@/lib/invoices/void-actions` — import them directly.
 // (A 'use server' file may only export async functions, so we can't re-export here.)
 
 // Shape the create/update form sends for the invoice header. Mirrors
@@ -82,14 +84,6 @@ export type InvoicePayload = {
   ship_to_contact: string | null
   delivery_address: string | null
   subtotal: number
-  // Per-invoice discount (Wave 4). The create/update RPCs read these from the
-  // p_invoice blob; the client stays authoritative for subtotal/total.
-  discount_pct: number
-  discount_amount: number
-  // Per-invoice SST tax (Wave 5). Same contract as discount: the RPCs read these
-  // from the p_invoice blob; the client stays authoritative for the math.
-  tax_rate: number
-  tax_amount: number
   total: number
 }
 
@@ -136,10 +130,17 @@ export async function createInvoiceAction(payload: {
   if (gate.ok === false) return gate
 
   const admin = createAdminClient()
+  const invoicePayload = {
+    ...payload.p_invoice,
+    created_by: gate.userId,
+    ...(payload.p_invoice.status === 'draft'
+      ? {}
+      : invoiceSnapshotFromSettings(await getBillingSettings())),
+  }
   // Single transactional RPC: header + items succeed or fail together. We inject
   // the acting user as created_by; status comes from the caller (draft/sent).
   const { data, error } = await admin.rpc('create_invoice_with_items', {
-    p_invoice: { ...payload.p_invoice, created_by: gate.userId } as unknown as Json,
+    p_invoice: invoicePayload as unknown as Json,
     p_items: payload.p_items as unknown as Json,
   })
   if (error || !data) return { ok: false, error: error?.message ?? 'Failed to create invoice' }
@@ -193,7 +194,13 @@ export async function markSentAction(id: string): Promise<ActionResult> {
   if (!gate.ok) return gate
 
   const admin = createAdminClient()
-  const { error } = await admin.from('invoices').update({ status: 'sent' }).eq('id', id)
+  const { error } = await admin
+    .from('invoices')
+    .update({
+      status: 'sent',
+      ...invoiceSnapshotFromSettings(await getBillingSettings()),
+    })
+    .eq('id', id)
   if (error) return { ok: false, error: error.message }
   revalidateInvoice(id)
   return { ok: true }

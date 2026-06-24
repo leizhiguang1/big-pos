@@ -37,11 +37,11 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const invoiceOptions = invoices.map((inv) => ({ id: inv.id, invoice_number: inv.invoice_number }))
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="w-full max-w-5xl space-y-6">
       <CustomerDetailHeader id={id} clinicName={customer.clinic_name} contactPerson={customer.contact_person} />
 
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card className="md:col-span-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader><CardTitle className="text-sm text-muted-foreground">Contact Details</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {customer.phone && (

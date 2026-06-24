@@ -62,26 +62,26 @@ export default function LoginPage() {
         </div>
       </section>
 
-      <div className="flex min-h-dvh items-start justify-center px-4 py-12 sm:py-16 lg:min-h-0 lg:items-center lg:p-10">
-        <div className="w-full min-w-0 max-w-sm">
-          <div className="mb-8 text-center lg:hidden">
+      <div className="flex min-h-dvh min-w-0 items-start justify-center px-4 py-12 sm:py-16 lg:min-h-0 lg:items-center lg:p-10">
+        <div className="w-full min-w-0 sm:max-w-sm">
+          <div className="mb-8 min-w-0 text-center lg:hidden">
             <Image
               src="/chidental-rectangle.png"
               alt={COMPANY.name}
               width={317}
               height={86}
               priority
-              className="mx-auto h-auto w-56 object-contain"
+              className="mx-auto h-auto w-52 max-w-full object-contain sm:w-56"
             />
             <p className="mt-3 text-sm text-muted-foreground">Lab Management System</p>
           </div>
 
-          <Card className="w-full overflow-hidden">
+          <Card className="w-full max-w-full overflow-hidden">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg">Staff Login</CardTitle>
               <CardDescription>Enter your User ID and 6-digit PIN</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="min-w-0">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="username">User ID</Label>

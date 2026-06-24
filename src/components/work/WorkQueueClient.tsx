@@ -26,7 +26,7 @@ import {
   encodeWork, decodeWork, nextWorkStep, matchesWorkFilter,
   labelForValue, colorForValue, orderedGroupKeys,
 } from '@/lib/work-stages'
-import { WorkStageStepper } from '@/components/work/WorkStageStepper'
+import { WorkStageChips } from '@/components/work/WorkStageChips'
 import { resume } from '@/domain/production'
 import { updateWorkStatusAction } from '@/data/invoice-actions'
 import type { WorkQueueRow } from '@/data/work'
@@ -168,7 +168,7 @@ export function WorkQueueClient({
     if (value === RESUME_VALUE) {
       ({ work_status, stage_id } = { work_status: resume(resumeStatus), stage_id: null })
     } else if (value === ADVANCE_VALUE) {
-      const next = row ? nextWorkStep(activeStages, row.work_status, row.stage_id) : null
+      const next = row ? nextWorkStep(row.work_status) : null
       if (!next) return
       ;({ work_status, stage_id } = next)
     } else {
@@ -282,66 +282,68 @@ export function WorkQueueClient({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {chips.map(c => {
-          const stageKey = c.key !== 'active' && c.key !== 'all' ? (c.key as WorkStatus) : null
-          const isSelected = filter === c.key
-          const filled = stageKey ? cn(workStatusColor(stageKey, statusConfigs), 'ring-1 ring-inset ring-current') : META_CHIP_FILLED[c.key as 'active' | 'all']
-          const outlined = stageKey ? cn(workStatusColor(stageKey, statusConfigs), 'opacity-75 hover:opacity-100') : META_CHIP_OUTLINED[c.key as 'active' | 'all']
-          return (
-            <button
-              key={c.key}
-              onClick={() => setFilter(c.key)}
-              className={cn(
-                'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                isSelected ? filled : cn(outlined, 'hover:bg-muted'),
-              )}
-            >
-              {c.label}
-              <span className={cn(
-                'inline-flex items-center justify-center min-w-[18px] h-4 rounded-full px-1 text-[10px] font-semibold',
-                isSelected ? 'bg-white/25' : 'bg-muted text-muted-foreground',
-              )}>
-                {c.count}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-      {(filter === 'in_progress' || (typeof filter === 'string' && filter.startsWith('stage:'))) && activeStages.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 pl-1">
-          <span className="text-xs text-muted-foreground">Stage:</span>
-          {activeStages.map(s => {
-            const key: FilterMode = `stage:${s.id}`
-            const isSelected = filter === key
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {chips.map(c => {
+            const stageKey = c.key !== 'active' && c.key !== 'all' ? (c.key as WorkStatus) : null
+            const isSelected = filter === c.key
+            const filled = stageKey ? cn(workStatusColor(stageKey, statusConfigs), 'ring-1 ring-inset ring-current') : META_CHIP_FILLED[c.key as 'active' | 'all']
+            const outlined = stageKey ? cn(workStatusColor(stageKey, statusConfigs), 'opacity-75 hover:opacity-100') : META_CHIP_OUTLINED[c.key as 'active' | 'all']
             return (
               <button
-                key={s.id}
-                onClick={() => setFilter(isSelected ? 'in_progress' : key)}
+                key={c.key}
+                onClick={() => setFilter(c.key)}
                 className={cn(
-                  'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-colors',
-                  s.color ?? 'bg-gray-100 text-gray-700',
-                  isSelected ? 'ring-1 ring-inset ring-current' : 'opacity-75 hover:opacity-100',
+                  'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  isSelected ? filled : cn(outlined, 'hover:bg-muted'),
                 )}
               >
-                {s.label}
-                <span className="inline-flex items-center justify-center min-w-[18px] h-4 rounded-full px-1 text-[10px] font-semibold bg-white/40">
-                  {stageCounts.get(s.id) ?? 0}
+                {c.label}
+                <span className={cn(
+                  'inline-flex items-center justify-center min-w-[18px] h-4 rounded-full px-1 text-[10px] font-semibold',
+                  isSelected ? 'bg-white/25' : 'bg-muted text-muted-foreground',
+                )}>
+                  {c.count}
                 </span>
               </button>
             )
           })}
         </div>
-      )}
+        {(filter === 'in_progress' || (typeof filter === 'string' && filter.startsWith('stage:'))) && activeStages.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pl-1">
+            <span className="text-xs text-muted-foreground">Stage:</span>
+            {activeStages.map(s => {
+              const key: FilterMode = `stage:${s.id}`
+              const isSelected = filter === key
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setFilter(isSelected ? 'in_progress' : key)}
+                  className={cn(
+                    'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                    s.color ?? 'bg-gray-100 text-gray-700',
+                    isSelected ? 'ring-1 ring-inset ring-current' : 'opacity-75 hover:opacity-100',
+                  )}
+                >
+                  {s.label}
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-4 rounded-full px-1 text-[10px] font-semibold bg-white/40">
+                    {stageCounts.get(s.id) ?? 0}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
 
-      <div className="relative w-full sm:max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search item, invoice, clinic…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-9"
-        />
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search item, invoice, clinic…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
       </div>
 
       {grouped.length === 0 && (
@@ -351,7 +353,6 @@ export function WorkQueueClient({
       <div className="space-y-4">
         {grouped.map(group => {
           const isCollapsed = collapsed.has(group.key)
-          const decoded = decodeWork(group.key)
           return (
             <Card key={group.key} className="overflow-hidden">
               <button
@@ -363,12 +364,6 @@ export function WorkQueueClient({
                   {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                   <SlotBadge value={group.key} stagesById={allStagesById} statusConfigs={statusConfigs} />
                   <span className="text-sm text-muted-foreground">{group.items.length} item{group.items.length === 1 ? '' : 's'}</span>
-                  {decoded.work_status === 'in_progress' && decoded.stage_id && (() => {
-                    const i = activeStages.findIndex(s => s.id === decoded.stage_id)
-                    return i >= 0 ? (
-                      <span className="text-xs text-muted-foreground">Step {i + 1} of {activeStages.length}</span>
-                    ) : null
-                  })()}
                 </div>
               </button>
               {!isCollapsed && (
@@ -403,10 +398,12 @@ export function WorkQueueClient({
                         <div className="flex-1 min-w-0">
                           <div className="text-sm text-foreground truncate">{row.description}</div>
                           {row.work_status === 'in_progress' && (
-                            <WorkStageStepper
+                            <WorkStageChips
                               activeStages={activeStages}
                               workStatus={row.work_status}
                               stageId={row.stage_id}
+                              statusConfigs={statusConfigs}
+                              onSelect={stageId => updateStatus(row.id, `stage:${stageId}`, row.resume_status)}
                             />
                           )}
                           {isMoved ? (

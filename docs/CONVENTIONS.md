@@ -45,9 +45,8 @@ Use these exact labels. Don't invent synonyms ("Client", "Account", "Customer", 
 | A line on an invoice | **Line item** / **Item** |
 | Job-floor progress | **Work status** (the In-Progress sub-steps are **Work stages**) |
 | Lab-to-doctor note on delivery | **Service status** |
-| Soft-deleted invoice | **Voided** (verb: **Void** / **Restore**) |
+| Soft-deleted invoice | **Voided** (verb: **Void**) |
 | Money owed | **Outstanding** / **Balance due** |
-| Tax | **SST** |
 
 **Recipient blocks (Bill To / Deliver To):** the entity name field is labeled **"Clinic"**
 (not "Name"/"Recipient"), and the person field is **"Contact person"** (not "Contact").
@@ -58,23 +57,21 @@ after "Name" tested as confusing on the New Invoice screen.
 
 ## 3. Money & invoice rules
 
-- **Order of math:** `total = subtotal − discount + tax`. Tax (SST) is charged on the
-  **post-discount** base: `tax = round((subtotal − discount) × tax_rate%)`. Discount is
-  `round(subtotal × discount_pct%)`. Both round to 2 dp.
+- **No discount or tax.** `total = subtotal` (sum of line `amount`s). Per-invoice discount and
+  SST tax were removed 2026-06-24 — the columns (`discount_pct`, `discount_amount`, `tax_rate`,
+  `tax_amount`) were dropped from `invoices` and the form/document show only Subtotal → Total.
 - **Payment terms are not stored per clinic.** A new invoice pre-fills its due date from a
   single lab-wide default (`DEFAULT_PAYMENT_TERMS_DAYS` in `lib/config.ts`): due = invoice
   date + that many days. A per-invoice exception is made by editing the due date directly —
   there is no per-clinic terms field. The printed invoice derives the shown "N Days" from the
   invoice's own dates (due − invoice date), so it always matches the dates on the page.
-- **Discount is per-invoice, starting at 0.** New invoices begin with no discount; it is set
-  on the invoice, not seeded from the clinic.
 - **Outstanding:** `status === 'paid' ? 0 : total − totalPaid`. The Record-Payment dialog
   pre-fills `max(0, total − totalPaid)`; the user never computes the balance.
 - **Payment status transitions** are decided by the `record_payment` RPC atomically:
   `sent/partial → paid` when paid ≥ total, else `partial`.
 - **Voiding is a soft-delete:** set `voided_at / voided_by / void_reason`; never hard-delete
   an invoice. Voided invoices are locked for everyone, show a VOID watermark, and drop out
-  of the Work queue and Reports. **Restore** reverses it.
+  of the Work queue and Reports. Voiding is terminal and cannot be restored in the app.
 
 ---
 
@@ -85,7 +82,7 @@ Three invoice tiers — keep the boundary consistent:
 - `invoices.view` — read invoices + the Work board, **and change work status** (shop-floor
   staff move jobs without billing rights).
 - `invoices.edit` — create invoices + edit **draft** invoices.
-- `invoices.manage` — record payments, **void/restore**, and edit **already-sent** invoices.
+- `invoices.manage` — record payments, **void**, and edit **already-sent** invoices.
 
 Others: `customers.view/edit`, `products.view/edit`, `reports.view`, `staff.manage`,
 `settings.manage`. **Role management is not a permission** — it is gated to the Super Admin
@@ -101,9 +98,11 @@ permission changes apply immediately with no re-login. Client `hasPermission()` 
 
 - Five statuses: `received → in_progress → ready → delivered`, plus `on_hold` (a pause on
   any status, which remembers where it came from via `resume_status`).
-- **"In Progress" has sub-stages** ("Work stages", configured in Settings). A staged item is
-  encoded as `stage:<id>`; a stage-less in-progress is just `in_progress`. Retired stages
-  still label legacy items.
+- **"In Progress" has sub-statuses** ("Work stages", configured in Settings). They have a
+  **display order only — not a required sequence**; a case may sit on any sub-status, move
+  between them in any order, or sit on **none** (bare `in_progress`). A staged item is encoded
+  as `stage:<id>`; a stage-less in-progress is just `in_progress`. Retired stages still label
+  legacy items.
 - **Work status is per line item, not per invoice.** (The old invoice-level
   "advance all items" action was removed.) The Kanban board's 5 columns model only the top
   statuses — dropping a card clears the stage; use the dropdown to pick a specific stage.
@@ -124,7 +123,7 @@ permission changes apply immediately with no re-login. Client `hasPermission()` 
    message. Never leak a raw/digested server error to the user.
 4. **Admin vs session client.** Use the **session** client when the acting user must be
    recorded (e.g. status-history triggers) or RLS should apply. Use the **admin** client only
-   for privileged writes (void/restore, employee management) — and remember prod needs
+   for privileged writes (void, employee management) — and remember prod needs
    `SUPABASE_SERVICE_ROLE_KEY` set for those.
 5. **Soft-delete, don't destroy.** Products deactivate; invoices void; work stages retire.
    History must always survive.

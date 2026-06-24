@@ -9,9 +9,10 @@
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger,
 } from '@/components/ui/select'
+import { ManageOptionsLink } from '@/components/ui/manage-options-link'
 import { cn } from '@/lib/utils'
 import {
-  encodeWork, nextWorkStep, workColor, workLabel, workLabelWithPosition,
+  encodeWork, nextWorkStep, workColor, workLabel, workSubStatusLabel,
   STAGE_DEFAULT_COLOR, type WorkOption,
 } from '@/lib/work-stages'
 import { workStatusColor, workStatusLabel, type WorkStatusDisplay } from '@/lib/work-status-config'
@@ -82,8 +83,8 @@ export function WorkStatusSelect({
     })
   }
 
-  const next = nextWorkStep(activeStages, workStatus, stageId)
-  const triggerLabel = workLabelWithPosition(activeStages, workStatus, stageId, stagesById, statusConfigs)
+  const next = nextWorkStep(workStatus)
+  const triggerLabel = workSubStatusLabel(workStatus, stageId, stagesById, statusConfigs)
 
   return (
     <Select value={value} onValueChange={onValueChange}>
@@ -128,23 +129,34 @@ export function WorkStatusSelect({
           </>
         )}
         <WorkOptionItem option={fixed('received', statusConfigs)} />
-        <SelectGroup>
-          <SelectLabel className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">In Progress</SelectLabel>
-          <div className="ml-3 border-l border-border pl-1">
-            {inProgress.map((o, i) => (
+        {/* In-Progress sub-statuses live in their own tinted sub-panel so they
+            read as a contained group of "In Progress" and never blend into the
+            top-level status rows above/below. */}
+        <div className="my-1 rounded-md border border-border/70 bg-muted/40 p-1">
+          <SelectGroup>
+            <SelectLabel className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">In Progress</SelectLabel>
+            {/* "No sub-status" — bare in_progress; lets a user enter In Progress
+                without a stage, or clear a stage back to none. */}
+            <SelectItem value="in_progress" textValue="No sub-status" className="py-2">
+              <span className="flex w-full items-center gap-2">
+                <span className="text-sm text-muted-foreground">No sub-status</span>
+                {current === 'in_progress' && <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
+              </span>
+            </SelectItem>
+            {inProgress.map(o => (
               <SelectItem key={o.value} value={o.value} textValue={o.label} className="py-2">
                 <span className="flex w-full items-center gap-2">
-                  <span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">{i + 1}</span>
                   <OptionRow option={o} />
                   {o.value === current && <Check className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
                 </span>
               </SelectItem>
             ))}
-          </div>
-        </SelectGroup>
+          </SelectGroup>
+        </div>
         <WorkOptionItem option={fixed('ready', statusConfigs)} />
         <WorkOptionItem option={fixed('delivered', statusConfigs)} />
         <WorkOptionItem option={fixed('on_hold', statusConfigs)} />
+        <ManageOptionsLink href="/settings/work-statuses" label="Manage statuses & stages" />
       </SelectContent>
     </Select>
   )
