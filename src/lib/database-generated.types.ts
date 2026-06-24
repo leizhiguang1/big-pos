@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          entity_id: string | null
+          entity_label: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          entity_id?: string | null
+          entity_label?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_label?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
       credits: {
         Row: {
           amount: number
@@ -237,6 +273,9 @@ export type Database = {
           created_at: string
           created_by: string
           customer_id: string
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           delivery_address: string | null
           delivery_order_number: string
           doctor: string | null
@@ -269,6 +308,9 @@ export type Database = {
           created_at?: string
           created_by: string
           customer_id: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           delivery_address?: string | null
           delivery_order_number: string
           doctor?: string | null
@@ -301,6 +343,9 @@ export type Database = {
           created_at?: string
           created_by?: string
           customer_id?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           delivery_address?: string | null
           delivery_order_number?: string
           doctor?: string | null
@@ -658,6 +703,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_restore_void: { Args: { p_id: string }; Returns: undefined }
       auth_has_permission: { Args: { p_perm: string }; Returns: boolean }
       create_invoice_with_items: {
         Args: { p_invoice: Json; p_items: Json }
