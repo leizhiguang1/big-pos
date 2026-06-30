@@ -1,7 +1,12 @@
+import { redirect } from 'next/navigation'
 import { getBillingSettings } from '@/data/billing-settings'
 import { BillingSettingsForm } from '@/components/settings/BillingSettingsForm'
+import { requirePermission } from '@/lib/auth/require-permission'
 
 export default async function BillingSettingsPage() {
+  const gate = await requirePermission('settings.manage')
+  if (gate.ok === false) redirect('/dashboard')
+
   const settings = await getBillingSettings()
 
   return (
