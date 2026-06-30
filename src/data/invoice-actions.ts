@@ -60,6 +60,9 @@ import { hold } from '@/domain/production'
 import type { Json, TablesUpdate, WorkStatus } from '@/lib/database.types'
 import { getBillingSettings } from '@/data/billing-settings'
 import { invoiceSnapshotFromSettings } from '@/lib/billing-settings'
+import { logInvoiceActivity } from '@/lib/audit/audit-log'
+import { diffFields } from '@/lib/audit/diff'
+import { INVOICE_FIELD_LABELS, RECIPIENT_FIELD_LABELS } from '@/lib/audit/action-labels'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 export type CreateResult = { ok: true; id: string } | { ok: false; error: string }
@@ -106,6 +109,12 @@ function revalidateInvoice(id: string) {
   revalidatePath(`/invoices/${id}`)
 }
 
+// Best-effort lookup of an invoice's number for the activity row's entity_label.
+async function invoiceLabel(admin: ReturnType<typeof createAdminClient>, id: string): Promise<string | null> {
+  const { data } = await admin.from('invoices').select('invoice_number').eq('id', id).single()
+  return data?.invoice_number ?? null
+}
+
 // Content-edit gate: replicate `canEditInvoice` server-side. Loads the invoice's
 // current status + void marker, then requires invoices.edit for drafts and
 // invoices.manage for already-sent (or voided → locked for everyone).
@@ -145,8 +154,14 @@ export async function createInvoiceAction(payload: {
     p_items: payload.p_items as unknown as Json,
   })
   if (error || !data) return { ok: false, error: error?.message ?? 'Failed to create invoice' }
+  const newId = data as string
+  await logInvoiceActivity({
+    invoiceId: newId, actorId: gate.userId, actorName: gate.actorName,
+    action: 'invoice.created', entityLabel: await invoiceLabel(admin, newId),
+    metadata: { status: payload.p_invoice.status },
+  })
   revalidatePath('/invoices')
-  return { ok: true, id: data as string }
+  return { ok: true, id: newId }
 }
 
 export async function updateInvoiceAction(
@@ -157,12 +172,34 @@ export async function updateInvoiceAction(
   if (!gate.ok) return gate
 
   const admin = createAdminClient()
+  const { data: beforeInv } = await admin
+    .from('invoices')
+    .select('invoice_date, due_date, notes, patient, doctor, service_status_id, subtotal, total, invoice_number')
+    .eq('id', id).single()
+  const { data: beforeItems } = await admin
+    .from('invoice_items').select('id').eq('invoice_id', id)
+  const beforeCount = beforeItems?.length ?? 0
+
   const { error } = await admin.rpc('update_invoice_with_items', {
     p_invoice_id: id,
     p_invoice: payload.p_invoice as unknown as Json,
     p_items: payload.p_items as unknown as Json,
   })
   if (error) return { ok: false, error: error.message }
+
+  const headerChanges = diffFields((beforeInv ?? {}) as Record<string, unknown>, payload.p_invoice as unknown as Record<string, unknown>, INVOICE_FIELD_LABELS)
+  const keptIds = new Set(payload.p_items.filter(i => i.id).map(i => i.id))
+  const removed = (beforeItems ?? []).filter(b => !keptIds.has(b.id)).length
+  const added = payload.p_items.filter(i => !i.id).length
+  const itemsChanged = added > 0 || removed > 0
+  if (headerChanges.length > 0 || itemsChanged) {
+    await logInvoiceActivity({
+      invoiceId: id, actorId: gate.userId, actorName: gate.actorName,
+      action: 'invoice.edited', entityLabel: beforeInv?.invoice_number ?? null,
+      changes: headerChanges.length > 0 ? headerChanges : null,
+      metadata: itemsChanged ? { items: { before_count: beforeCount, after_count: payload.p_items.length, added, removed } } : null,
+    })
+  }
   revalidateInvoice(id)
   return { ok: true }
 }
@@ -184,6 +221,11 @@ export async function recordPaymentAction(
     p_notes: input.notes,
   })
   if (error) return { ok: false, error: error.message }
+  await logInvoiceActivity({
+    invoiceId: id, actorId: gate.userId, actorName: gate.actorName,
+    action: 'payment.recorded', entityLabel: await invoiceLabel(admin, id),
+    metadata: { amount: input.amount, payment_date: input.payment_date ?? null, reference_number: input.reference ?? null },
+  })
   revalidateInvoice(id)
   return { ok: true }
 }
@@ -203,6 +245,10 @@ export async function markSentAction(id: string): Promise<ActionResult> {
     })
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
+  await logInvoiceActivity({
+    invoiceId: id, actorId: gate.userId, actorName: gate.actorName,
+    action: 'invoice.issued', entityLabel: await invoiceLabel(admin, id),
+  })
   revalidateInvoice(id)
   return { ok: true }
 }
@@ -276,9 +322,14 @@ export async function updateWorkNoteAction(
     .from('invoice_items')
     .update({ work_note: value })
     .eq('id', itemId)
-    .select('invoice_id')
+    .select('invoice_id, description')
     .single()
   if (error) return { ok: false, error: error.message }
+  await logInvoiceActivity({
+    invoiceId: data?.invoice_id ?? null, actorId: gate.userId, actorName: gate.actorName,
+    action: 'invoice.work_note_changed', entityLabel: null,
+    metadata: { item: data?.description ?? null, note: value },
+  })
   if (data?.invoice_id) revalidateInvoice(data.invoice_id)
   return { ok: true }
 }
@@ -291,11 +342,19 @@ export async function updateCaseDetailsAction(
   if (!gate.ok) return gate
 
   const admin = createAdminClient()
+  const { data: before } = await admin.from('invoices').select('patient, doctor, invoice_number').eq('id', id).single()
   const { error } = await admin
     .from('invoices')
     .update({ patient: input.patient, doctor: input.doctor })
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
+  const changes = diffFields((before ?? {}) as Record<string, unknown>, input, { patient: 'Patient', doctor: 'Doctor' })
+  if (changes.length > 0) {
+    await logInvoiceActivity({
+      invoiceId: id, actorId: gate.userId, actorName: gate.actorName,
+      action: 'invoice.case_changed', entityLabel: before?.invoice_number ?? null, changes,
+    })
+  }
   revalidateInvoice(id)
   return { ok: true }
 }
@@ -305,11 +364,19 @@ export async function updateServiceStatusAction(id: string, serviceStatusId: str
   if (!gate.ok) return gate
 
   const admin = createAdminClient()
+  const { data: before } = await admin.from('invoices').select('service_status_id, invoice_number').eq('id', id).single()
   const { error } = await admin
     .from('invoices')
     .update({ service_status_id: serviceStatusId })
     .eq('id', id)
   if (error) return { ok: false, error: error.message }
+  if ((before?.service_status_id ?? null) !== (serviceStatusId ?? null)) {
+    await logInvoiceActivity({
+      invoiceId: id, actorId: gate.userId, actorName: gate.actorName,
+      action: 'invoice.service_status_changed', entityLabel: before?.invoice_number ?? null,
+      changes: [{ field: 'service_status_id', label: 'Service status', from: before?.service_status_id ?? null, to: serviceStatusId ?? null }],
+    })
+  }
   revalidateInvoice(id)
   return { ok: true }
 }
@@ -335,6 +402,8 @@ export async function saveRecipientAction(
   if (!gate.ok) return gate
 
   const admin = createAdminClient()
+  const recipientCols = 'bill_to_name, bill_to_contact, bill_to_phone, billing_address, ship_to_name, ship_to_contact, delivery_address, invoice_number'
+  const { data: before } = await admin.from('invoices').select(recipientCols).eq('id', id).single()
   const { error } = await admin.from('invoices').update(fields).eq('id', id)
   if (error) return { ok: false, error: error.message }
 
@@ -353,6 +422,16 @@ export async function saveRecipientAction(
       .update(customerUpdate)
       .eq('id', opts.customerId)
     if (custErr) return { ok: false, error: custErr.message }
+  }
+
+  const changes = diffFields((before ?? {}) as Record<string, unknown>, fields as unknown as Record<string, unknown>, RECIPIENT_FIELD_LABELS)
+  if (changes.length > 0) {
+    await logInvoiceActivity({
+      invoiceId: id, actorId: gate.userId, actorName: gate.actorName,
+      action: 'invoice.recipient_changed',
+      entityLabel: (before as { invoice_number?: string } | null)?.invoice_number ?? null,
+      changes,
+    })
   }
 
   revalidateInvoice(id)

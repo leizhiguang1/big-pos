@@ -10,7 +10,7 @@
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireSuperadmin } from '@/lib/auth/require-permission'
-import { writeAuditLog } from '@/lib/audit/audit-log'
+import { writeAuditLog, logInvoiceActivity } from '@/lib/audit/audit-log'
 import { logServerError } from '@/lib/log'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
@@ -42,6 +42,10 @@ export async function softDeleteInvoiceAction(input: { id: string; reason?: stri
     actorId: gate.userId, action: 'invoice.soft_delete', entityType: 'invoice',
     entityId: input.id, entityLabel: inv?.invoice_number ?? null, reason: input.reason,
   })
+  await logInvoiceActivity({
+    invoiceId: input.id, actorId: gate.userId, actorName: gate.actorName,
+    action: 'invoice.soft_deleted', entityLabel: inv?.invoice_number ?? null, reason: input.reason,
+  })
   revalidateInvoiceViews(input.id)
   return { ok: true }
 }
@@ -63,6 +67,10 @@ export async function restoreInvoiceAction(id: string): Promise<ActionResult> {
   await writeAuditLog({
     actorId: gate.userId, action: 'invoice.restore', entityType: 'invoice',
     entityId: id, entityLabel: inv?.invoice_number ?? null,
+  })
+  await logInvoiceActivity({
+    invoiceId: id, actorId: gate.userId, actorName: gate.actorName,
+    action: 'invoice.restored', entityLabel: inv?.invoice_number ?? null,
   })
   revalidateInvoiceViews(id)
   return { ok: true }
@@ -86,6 +94,10 @@ export async function restoreVoidedInvoiceAction(input: { id: string; reason?: s
     actorId: gate.userId, action: 'invoice.void_restore', entityType: 'invoice',
     entityId: input.id, entityLabel: inv?.invoice_number ?? null, reason: input.reason,
   })
+  await logInvoiceActivity({
+    invoiceId: input.id, actorId: gate.userId, actorName: gate.actorName,
+    action: 'invoice.void_restored', entityLabel: inv?.invoice_number ?? null, reason: input.reason,
+  })
   revalidateInvoiceViews(input.id)
   return { ok: true }
 }
@@ -107,6 +119,11 @@ export async function purgeInvoiceAction(input: { id: string; reason?: string })
     actorId: gate.userId, action: 'invoice.purge', entityType: 'invoice',
     entityId: input.id, entityLabel: inv?.invoice_number ?? null, reason: input.reason,
     metadata: (inv ?? null) as Record<string, unknown> | null,
+  })
+  await logInvoiceActivity({
+    invoiceId: input.id, actorId: gate.userId, actorName: gate.actorName,
+    action: 'invoice.purged', entityLabel: inv?.invoice_number ?? null, reason: input.reason,
+    metadata: { snapshot: (inv ?? null) as Record<string, unknown> | null },
   })
   revalidateInvoiceViews(input.id)
   return { ok: true }

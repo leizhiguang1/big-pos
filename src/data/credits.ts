@@ -21,6 +21,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requirePermission } from '@/lib/auth/require-permission'
+import { logInvoiceActivity } from '@/lib/audit/audit-log'
 import { creditInputSchema, type CreditInput } from '@/domain/schemas'
 import type { Credit } from '@/lib/database.types'
 
@@ -67,6 +68,12 @@ export async function createCreditAction(
     created_by: gate.userId,
   })
   if (error) return { ok: false, error: error.message }
+
+  await logInvoiceActivity({
+    invoiceId: c.invoice_id ?? null, actorId: gate.userId, actorName: gate.actorName,
+    action: 'credit.recorded', entityLabel: null,
+    metadata: { amount: c.amount, reason: c.reason, customer_id: customerId },
+  })
 
   // Refresh the clinic detail (account balance + credits card) and its statement.
   revalidatePath(`/customers/${customerId}`)
