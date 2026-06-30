@@ -32,52 +32,73 @@ const summary: ReportSummary = {
       customers: { clinic_name: 'Origin Dental Clinic' },
     },
   ],
-  byCustomer: [{ name: 'Origin Dental Clinic', total: 4500, count: 2 }],
+  byCustomer: [
+    { name: 'Origin Dental Clinic', total: 4500, count: 2 },
+    { name: 'Dr Ray & Partners Dental Clinic', total: 1800, count: 1 },
+  ],
   byProduct: [{ name: 'Zirconia Crown', total: 3000, qty: 5 }],
 }
 
 const range = { from: '2026-06-01', to: '2026-06-30' }
+const GENERATED = '2026-06-30'
 
 describe('buildReportCsv', () => {
-  it('emits every section with its header row', () => {
-    const csv = buildReportCsv(summary, range)
+  it('writes the title block with company, range, and generated date', () => {
+    const csv = buildReportCsv(summary, range, GENERATED)
+    expect(csv).toContain('Chi Dental Lab')
     expect(csv).toContain('Sales Report')
-    expect(csv).toContain('Range,2026-06-01,2026-06-30')
-    expect(csv).toContain('Summary')
-    expect(csv).toContain('Total Invoiced,15180')
-    expect(csv).toContain('Outstanding Invoices')
-    expect(csv).toContain('Paid Invoices')
-    expect(csv).toContain('Revenue by Clinic (Top 10)')
-    expect(csv).toContain('Revenue by Product (Top 10)')
+    expect(csv).toContain('Range,2026-06-01 to 2026-06-30')
+    expect(csv).toContain('Generated,2026-06-30')
   })
 
-  it('writes raw numeric amounts and ISO dates, not formatted strings', () => {
-    const csv = buildReportCsv(summary, range)
-    // Outstanding row: number,clinic,due,daysOverdue,amount,status
-    expect(csv).toContain('INV-2026-0015,Dr Ray & Partners Dental Clinic,2026-07-08,-8,1800,Issued')
-    // Paid row uses the invoice date and the friendly "Paid" label
-    expect(csv).toContain('INV-2026-0001,Origin Dental Clinic,2026-06-02,160,Paid')
+  it('emits the summary as a Metric,Value table with 2-dp money', () => {
+    const csv = buildReportCsv(summary, range, GENERATED)
+    expect(csv).toContain('Metric,Value')
+    expect(csv).toContain('Total Invoiced,15180.00')
+    expect(csv).toContain('Collected (Paid),160.00')
+    expect(csv).toContain('Outstanding,15020.00')
+    expect(csv).toContain('Invoice Count,14')
+  })
+
+  it('writes outstanding rows (2-dp amount, ISO date, friendly status) + subtotal', () => {
+    const csv = buildReportCsv(summary, range, GENERATED)
+    expect(csv).toContain('INV-2026-0015,Dr Ray & Partners Dental Clinic,2026-07-08,-8,1800.00,Issued')
+    expect(csv).toContain('Subtotal,,,,15020.00,')
     expect(csv).not.toContain('RM')
   })
 
-  it('uses the friendly payment-status label (sent -> Issued)', () => {
-    const csv = buildReportCsv(summary, range)
-    expect(csv).toContain(',Issued')
-    expect(csv).not.toContain(',sent')
+  it('writes paid rows + subtotal', () => {
+    const csv = buildReportCsv(summary, range, GENERATED)
+    expect(csv).toContain('INV-2026-0001,Origin Dental Clinic,2026-06-02,160.00,Paid')
+    expect(csv).toContain('Subtotal,,,160.00,')
+  })
+
+  it('writes the FULL By-Clinic breakdown (all rows) with a Total', () => {
+    const csv = buildReportCsv(summary, range, GENERATED)
+    expect(csv).toContain('Revenue by Clinic')
+    expect(csv).toContain('Origin Dental Clinic,2,4500.00')
+    expect(csv).toContain('Dr Ray & Partners Dental Clinic,1,1800.00')
+    expect(csv).toContain('Total,3,6300.00')
+  })
+
+  it('writes the By-Product breakdown with a Total', () => {
+    const csv = buildReportCsv(summary, range, GENERATED)
+    expect(csv).toContain('Revenue by Product')
+    expect(csv).toContain('Zirconia Crown,5,3000.00')
+    expect(csv).toContain('Total,5,3000.00')
   })
 
   it('quotes fields that contain commas or quotes', () => {
     const csv = buildReportCsv(
       { ...summary, byProduct: [{ name: 'Crown, "Premium"', total: 10, qty: 1 }] },
       range,
+      GENERATED,
     )
-    expect(csv).toContain('"Crown, ""Premium""",1,10')
+    expect(csv).toContain('"Crown, ""Premium""",1,10.00')
   })
 
-  it('aggregation rows carry count/qty and total', () => {
-    const csv = buildReportCsv(summary, range)
-    expect(csv).toContain('Origin Dental Clinic,2,4500')
-    expect(csv).toContain('Zirconia Crown,5,3000')
+  it('uses CRLF line endings', () => {
+    expect(buildReportCsv(summary, range, GENERATED)).toContain('\r\n')
   })
 
   it('handles empty sections without crashing', () => {
@@ -91,13 +112,10 @@ describe('buildReportCsv', () => {
       byCustomer: [],
       byProduct: [],
     }
-    const csv = buildReportCsv(empty, range)
-    expect(csv).toContain('Total Invoiced,0')
-    expect(csv).toContain('Outstanding Invoices')
-  })
-
-  it('uses CRLF line endings', () => {
-    expect(buildReportCsv(summary, range)).toContain('\r\n')
+    const csv = buildReportCsv(empty, range, GENERATED)
+    expect(csv).toContain('Total Invoiced,0.00')
+    expect(csv).toContain('Revenue by Clinic')
+    expect(csv).toContain('Total,0,0.00')
   })
 })
 

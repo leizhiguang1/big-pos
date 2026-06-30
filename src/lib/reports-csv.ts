@@ -1,10 +1,11 @@
-// Builds the Sales Reports page as a single downloadable CSV. Kept as a pure
-// function (no DOM/Blob) so it can be unit-tested; the client island handles the
-// actual file download. Money is emitted as raw numbers and dates as the ISO
-// `yyyy-MM-dd` strings the DB already stores, so the file is spreadsheet-ready.
+// Builds the Sales Reports page as a single clean, downloadable CSV. Pure (no
+// DOM/Blob) so it's unit-testable; the client island handles the download.
+// Money is 2-dp (still a plain number Excel can sum) and dates are ISO. Sections
+// carry titles, header rows, and totals; breakdowns include every row.
 
 import type { ReportSummary } from './reports'
 import { paymentStatusLabel } from './status-badge'
+import { COMPANY } from './config'
 
 // RFC 4180 field escaping: wrap in quotes when the value contains a comma,
 // quote, or newline, doubling any embedded quotes.
@@ -17,32 +18,39 @@ function row(fields: Array<string | number>): string {
   return fields.map(csvField).join(',')
 }
 
+// Consistent 2-decimal money; still a plain number for spreadsheet math.
+const money = (n: number): string => Number(n).toFixed(2)
+
 export function reportCsvFilename(range: { from: string; to: string }): string {
   return `sales-report_${range.from}_${range.to}.csv`
 }
 
-/**
- * The whole report for the selected range as one CSV: header + summary, the full
- * Outstanding and Paid invoice lists, and the By Clinic / By Product breakdowns
- * (top 10, matching the on-screen charts). Sections are separated by blank lines
- * and rows are CRLF-joined for Excel.
- */
-export function buildReportCsv(summary: ReportSummary, range: { from: string; to: string }): string {
+export function buildReportCsv(
+  summary: ReportSummary,
+  range: { from: string; to: string },
+  generatedOn: string,
+): string {
   const { totalInvoiced, totalPaidInvoices, totalOutstanding, invoiceCount, outstanding, paid, byCustomer, byProduct } =
     summary
   const lines: string[] = []
 
+  // Title block
+  lines.push(row([COMPANY.name]))
   lines.push(row(['Sales Report']))
-  lines.push(row(['Range', range.from, range.to]))
+  lines.push(row(['Range', `${range.from} to ${range.to}`]))
+  lines.push(row(['Generated', generatedOn]))
   lines.push('')
 
+  // Summary
   lines.push(row(['Summary']))
-  lines.push(row(['Total Invoiced', totalInvoiced]))
-  lines.push(row(['Collected (Paid)', totalPaidInvoices]))
-  lines.push(row(['Outstanding', totalOutstanding]))
-  lines.push(row(['Invoices', invoiceCount]))
+  lines.push(row(['Metric', 'Value']))
+  lines.push(row(['Total Invoiced', money(totalInvoiced)]))
+  lines.push(row(['Collected (Paid)', money(totalPaidInvoices)]))
+  lines.push(row(['Outstanding', money(totalOutstanding)]))
+  lines.push(row(['Invoice Count', invoiceCount]))
   lines.push('')
 
+  // Outstanding invoices (full list + subtotal)
   lines.push(row(['Outstanding Invoices']))
   lines.push(row(['Invoice #', 'Clinic', 'Due Date', 'Days Overdue', 'Amount', 'Status']))
   for (const inv of outstanding) {
@@ -52,13 +60,15 @@ export function buildReportCsv(summary: ReportSummary, range: { from: string; to
         inv.customers?.clinic_name ?? '',
         inv.due_date,
         inv.daysOverdue,
-        Number(inv.total),
+        money(Number(inv.total)),
         paymentStatusLabel(inv.status),
       ]),
     )
   }
+  lines.push(row(['Subtotal', '', '', '', money(totalOutstanding), '']))
   lines.push('')
 
+  // Paid invoices (full list + subtotal)
   lines.push(row(['Paid Invoices']))
   lines.push(row(['Invoice #', 'Clinic', 'Invoice Date', 'Amount', 'Status']))
   for (const inv of paid) {
@@ -67,25 +77,38 @@ export function buildReportCsv(summary: ReportSummary, range: { from: string; to
         inv.invoice_number,
         inv.customers?.clinic_name ?? '',
         inv.invoice_date,
-        Number(inv.total),
+        money(Number(inv.total)),
         paymentStatusLabel(inv.status),
       ]),
     )
   }
+  lines.push(row(['Subtotal', '', '', money(totalPaidInvoices), '']))
   lines.push('')
 
-  lines.push(row(['Revenue by Clinic (Top 10)']))
+  // Revenue by clinic (all rows + total)
+  lines.push(row(['Revenue by Clinic']))
   lines.push(row(['Clinic', 'Invoices', 'Total']))
+  let clinicCount = 0
+  let clinicTotal = 0
   for (const c of byCustomer) {
-    lines.push(row([c.name, c.count, c.total]))
+    lines.push(row([c.name, c.count, money(c.total)]))
+    clinicCount += c.count
+    clinicTotal += c.total
   }
+  lines.push(row(['Total', clinicCount, money(clinicTotal)]))
   lines.push('')
 
-  lines.push(row(['Revenue by Product (Top 10)']))
+  // Revenue by product (all rows + total)
+  lines.push(row(['Revenue by Product']))
   lines.push(row(['Product', 'Quantity', 'Total']))
+  let productQty = 0
+  let productTotal = 0
   for (const p of byProduct) {
-    lines.push(row([p.name, p.qty, p.total]))
+    lines.push(row([p.name, p.qty, money(p.total)]))
+    productQty += p.qty
+    productTotal += p.total
   }
+  lines.push(row(['Total', productQty, money(productTotal)]))
 
   return lines.join('\r\n')
 }
