@@ -347,7 +347,7 @@ export function WorkQueueClient({
       </div>
 
       {grouped.length === 0 && (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">No items.</CardContent></Card>
+        <Card><CardContent className="p-10 text-center text-muted-foreground">No items.</CardContent></Card>
       )}
 
       <div className="space-y-4">

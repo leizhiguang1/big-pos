@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { Pagination } from '@/components/ui/pagination'
 import { FilterChips, type FilterChip } from '@/components/ui/filter-chips'
 import { listViewState } from '@/lib/list-view-state'
-import { Plus, Search, Users } from 'lucide-react'
+import { Archive, Plus, Search, Users } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { useListUrlState, type ListUrlState } from '@/lib/use-list-url-state'
 import type { Customer } from '@/lib/database.types'
@@ -22,10 +22,19 @@ import { useAuth } from '@/contexts/AuthContext'
 // (`customers/page.tsx`) reads `searchParams`, fetches the page via
 // `getCustomersPage` (server-side search + sort + pagination), and passes it in;
 // this island only mutates the URL state via `useListUrlState`.
-export function CustomerListClient({ page, state }: { page: CustomerListPage; state: ListUrlState }) {
+export function CustomerListClient({ page, state, archived }: { page: CustomerListPage; state: ListUrlState; archived: boolean }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { hasPermission } = useAuth()
   const { search, setSearch, setPage, toggleSort, sort, clearSearch } = useListUrlState(state, '')
+
+  function toggleArchived() {
+    const params = new URLSearchParams(searchParams.toString())
+    if (archived) params.delete('archived')
+    else params.set('archived', '1')
+    params.delete('page') // reset pagination when switching views
+    router.push(`/customers?${params.toString()}`)
+  }
 
   const columns: Column<Customer>[] = [
     { key: 'clinic', header: 'Clinic', sortKey: 'clinic', cell: c => <span className="font-medium text-foreground">{c.clinic_name}</span> },
@@ -42,8 +51,8 @@ export function CustomerListClient({ page, state }: { page: CustomerListPage; st
   const emptyState = (
     <EmptyState
       icon={<Users className="h-8 w-8" />}
-      title={view === 'empty-no-results' ? 'No clinics match your search' : 'No clinics yet'}
-      description={view === 'empty-no-results' ? 'Try a different search term.' : 'Add your first clinic to get started.'}
+      title={archived ? 'No archived clinics' : (view === 'empty-no-results' ? 'No clinics match your search' : 'No clinics yet')}
+      description={archived ? 'Clinics you archive will appear here.' : (view === 'empty-no-results' ? 'Try a different search term.' : 'Add your first clinic to get started.')}
     />
   )
 
@@ -52,13 +61,18 @@ export function CustomerListClient({ page, state }: { page: CustomerListPage; st
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground sm:text-2xl">Clinics</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{page.total} registered</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{page.total} {archived ? 'archived' : 'registered'}</p>
         </div>
-        {hasPermission('customers.edit') && (
-          <Button className="w-full sm:w-auto" asChild>
-            <Link href="/customers/new"><Plus className="h-4 w-4 mr-2" />New Clinic</Link>
+        <div className="flex w-full gap-2 sm:w-auto">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={toggleArchived}>
+            <Archive className="h-4 w-4 mr-2" />{archived ? 'Show active' : 'Show archived'}
           </Button>
-        )}
+          {!archived && hasPermission('customers.edit') && (
+            <Button className="w-full sm:w-auto" asChild>
+              <Link href="/customers/new"><Plus className="h-4 w-4 mr-2" />New Clinic</Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-3">

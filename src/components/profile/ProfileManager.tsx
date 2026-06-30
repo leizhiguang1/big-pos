@@ -6,21 +6,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuth } from '@/contexts/AuthContext'
-import { PERMISSION_GROUPS } from '@/domain/permissions'
 import { updateMyProfile, changeMyPin } from '@/lib/auth/account-actions'
 
 export default function ProfileManager() {
-  const { user, username, roleName, isSuperadmin, hasPermission } = useAuth()
-
-  const grantedLabels = PERMISSION_GROUPS.flatMap(g => g.permissions)
-    .filter(p => hasPermission(p.key))
-    .map(p => p.label)
+  const { user, username, roleName } = useAuth()
 
   return (
     <div className="w-full max-w-2xl space-y-6">
       <div>
         <h1 className="text-xl font-bold text-foreground sm:text-2xl">My Profile</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Manage your own login and see what your role can do.</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Manage your own login.</p>
       </div>
 
       <Card>
@@ -33,21 +28,6 @@ export default function ProfileManager() {
 
       <NameForm initial={(user?.user_metadata?.full_name as string) ?? ''} />
       <PinForm />
-
-      <Card>
-        <CardContent className="space-y-2 p-4 sm:p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What I can do</p>
-          {isSuperadmin ? (
-            <p className="text-sm text-muted-foreground">All permissions (Super Admin).</p>
-          ) : grantedLabels.length ? (
-            <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-0.5">
-              {grantedLabels.map(l => <li key={l}>{l}</li>)}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">No special permissions assigned.</p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

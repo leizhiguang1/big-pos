@@ -3,9 +3,10 @@
 // the static contact/summary cards server-side. The interactive header (back +
 // gated Edit/New) and the clickable invoice history are client islands.
 
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getCustomerDetail } from '@/data/customers'
 import { getCreditsForCustomer } from '@/data/credits'
+import { requirePermission } from '@/lib/auth/require-permission'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { cn, formatCurrency, formatDate, todayISODate } from '@/lib/utils'
@@ -18,6 +19,9 @@ import { CustomerInvoiceHistory } from '@/components/customers/CustomerInvoiceHi
 import { IssueCreditDialog } from '@/components/customers/IssueCreditDialog'
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const gate = await requirePermission('customers.view')
+  if (gate.ok === false) redirect('/dashboard')
+
   const { id } = await params
   const [data, credits] = await Promise.all([getCustomerDetail(id), getCreditsForCustomer(id)])
   if (!data) notFound()
@@ -38,7 +42,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="w-full max-w-5xl space-y-6">
-      <CustomerDetailHeader id={id} clinicName={customer.clinic_name} contactPerson={customer.contact_person} />
+      <CustomerDetailHeader id={id} clinicName={customer.clinic_name} contactPerson={customer.contact_person} archivedAt={customer.archived_at} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -95,7 +99,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
         <div className="space-y-4">
           <Card>
-            <CardContent className="pt-4">
+            <CardContent className="p-4 sm:p-5">
               <p className="text-xs text-muted-foreground">Total Billed</p>
               <p className="text-xl font-bold text-foreground mt-1">{formatCurrency(totalBilled)}</p>
             </CardContent>
@@ -104,7 +108,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               components as explicit lines so the netting is legible rather than
               silently folded into one figure. */}
           <Card>
-            <CardContent className="pt-4 space-y-2">
+            <CardContent className="p-4 sm:p-5 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">Outstanding</p>
                 <p className="text-sm font-semibold tabular-nums text-yellow-600">{formatCurrency(totalOutstanding)}</p>

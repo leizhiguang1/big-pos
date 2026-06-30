@@ -15,7 +15,6 @@ import { formatDate, cn } from '@/lib/utils'
 import { ChevronRight } from 'lucide-react'
 import { WorkStatusBadge } from '@/components/work-status-badge'
 import { WorkStatusSelect, ADVANCE_VALUE } from '@/components/work-status-select'
-import { WorkStageChips } from '@/components/work/WorkStageChips'
 import { encodeWork, decodeWork, nextWorkStep, workLabel, workColor } from '@/lib/work-stages'
 import { updateWorkStatusAction, updateWorkNoteAction } from '@/data/invoice-actions'
 import type { InvoiceItem, InvoiceItemStatusHistory, WorkStage, WorkStatusConfig } from '@/lib/database.types'
@@ -93,13 +92,6 @@ export function WorkStatusEditor({ items, history, stages, statusConfigs }: Work
                     stageId={item.stage_id}
                     stagesById={stagesById}
                     statusConfigs={statusConfigs}
-                  />
-                  <WorkStageChips
-                    activeStages={activeStages}
-                    workStatus={item.work_status}
-                    stageId={item.stage_id}
-                    statusConfigs={statusConfigs}
-                    onSelect={stageId => updateWorkStatus(item.id, `stage:${stageId}`)}
                   />
                 </TableCell>
                 <TableCell className="text-right text-xs text-gray-500">
