@@ -1,7 +1,7 @@
 # Three focused CSV reports (Sales / Payment / Item Sales) — design
 
 - **Date:** 2026-06-30
-- **Status:** Approved (proceeding to plan)
+- **Status:** Implemented
 - **Area:** `/reports` page, `@/lib/reports`, `@/data/reports`, new `@/lib/reports-exports`
 
 ## Context
