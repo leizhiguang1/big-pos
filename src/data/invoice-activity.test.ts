@@ -9,10 +9,6 @@ const byTable: Record<string, unknown[]> = {
     { id: 'h1', invoice_item_id: 'it1', changed_at: '2026-06-30T08:00:00Z', changed_by_name: 'Bob', status: 'received', stage_id: null, invoice_items: { invoice_id: 'inv-1', description: 'Crown' } },
     { id: 'h2', invoice_item_id: 'it1', changed_at: '2026-06-30T11:00:00Z', changed_by_name: 'Bob', status: 'in_progress', stage_id: null, invoice_items: { invoice_id: 'inv-1', description: 'Crown' } },
   ],
-  work_status_configs: [
-    { status: 'received', label: 'Received' },
-    { status: 'in_progress', label: 'In Progress' },
-  ],
   service_statuses: [
     { id: 'svc-1', label: 'Pending' },
     { id: 'svc-2', label: 'Completed' },
@@ -49,14 +45,14 @@ describe('getInvoiceActivity', () => {
     ])
   })
 
-  it('derives work-status from→to with labels (prev status per item)', async () => {
+  it('derives work-status from→to as raw enums (prev status per item)', async () => {
     const out = await getInvoiceActivity('inv-1')
     const newest = out[0] // h2: received -> in_progress
-    expect(newest.changes?.[0]).toEqual({ field: 'work_status', label: 'Work status', from: 'Received', to: 'In Progress' })
-    expect((newest.metadata as { item?: string }).item).toBe('Crown')
+    expect(newest.changes?.[0]).toEqual({ field: 'work_status', label: 'Work status', from: 'received', to: 'in_progress' })
+    expect(newest.metadata).toMatchObject({ item: 'Crown', fromStatus: 'received', toStatus: 'in_progress' })
 
     const oldest = out[3] // h1: first change for the item, no prior
-    expect(oldest.changes?.[0]).toEqual({ field: 'work_status', label: 'Work status', from: null, to: 'Received' })
+    expect(oldest.changes?.[0]).toEqual({ field: 'work_status', label: 'Work status', from: null, to: 'received' })
   })
 
   it('resolves service-status UUIDs to labels', async () => {

@@ -37,7 +37,7 @@ export async function getInvoiceActivity(invoiceId: string): Promise<TimelineEve
   if (!gate.ok) return []
   const admin = createAdminClient()
 
-  const [{ data: activity }, { data: history }, { data: wsConfigs }, { data: svcStatuses }] = await Promise.all([
+  const [{ data: activity }, { data: history }, { data: svcStatuses }] = await Promise.all([
     admin
       .from('invoice_activity_log')
       .select('id, created_at, actor_name, action, entity_label, changes, reason, metadata')
@@ -48,13 +48,10 @@ export async function getInvoiceActivity(invoiceId: string): Promise<TimelineEve
       .select('id, invoice_item_id, changed_at, changed_by_name, status, stage_id, invoice_items!inner(invoice_id, description)')
       .eq('invoice_items.invoice_id', invoiceId)
       .order('changed_at', { ascending: true }),
-    admin.from('work_status_configs').select('status, label'),
     admin.from('service_statuses').select('id, label'),
   ])
 
-  const wsLabel = new Map<string, string>(((wsConfigs ?? []) as { status: string; label: string }[]).map(c => [c.status, c.label]))
   const svcLabel = new Map<string, string>(((svcStatuses ?? []) as { id: string; label: string }[]).map(s => [s.id, s.label]))
-  const labelWs = (s: string | null): string | null => (s ? (wsLabel.get(s) ?? s) : null)
   const labelSvc = (s: unknown): unknown => (s ? (svcLabel.get(String(s)) ?? s) : s)
 
   const fromActivity: TimelineEvent[] = ((activity ?? []) as ActivityRow[]).map(r => {
@@ -80,6 +77,8 @@ export async function getInvoiceActivity(invoiceId: string): Promise<TimelineEve
     arr.push(r)
     byItem.set(r.invoice_item_id, arr)
   }
+  // Work-status events carry the RAW status enums (not labels) so the panel can
+  // render them with the configured colour via WorkStatusBadge.
   const fromHistory: TimelineEvent[] = []
   for (const rows of byItem.values()) {
     rows.sort((a, b) => (a.changed_at < b.changed_at ? -1 : a.changed_at > b.changed_at ? 1 : 0))
@@ -88,8 +87,8 @@ export async function getInvoiceActivity(invoiceId: string): Promise<TimelineEve
       fromHistory.push({
         id: `ws-${r.id}`, at: r.changed_at, actorName: r.changed_by_name ?? '(unknown)',
         action: 'work_status.changed', entityLabel: null,
-        changes: [{ field: 'work_status', label: 'Work status', from: labelWs(prev), to: labelWs(r.status) }],
-        metadata: { item: r.invoice_items?.description ?? null },
+        changes: [{ field: 'work_status', label: 'Work status', from: prev, to: r.status }],
+        metadata: { item: r.invoice_items?.description ?? null, fromStatus: prev, toStatus: r.status },
       })
     })
   }

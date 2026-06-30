@@ -6,7 +6,11 @@ import {
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Pagination } from '@/components/ui/pagination'
+import { WorkStatusBadge } from '@/components/work-status-badge'
 import { cn, formatRelativeTime, formatDateTime, formatCurrency } from '@/lib/utils'
+import type { WorkStatus } from '@/lib/database.types'
+import type { WorkStatusDisplay } from '@/lib/work-status-config'
 import type { TimelineEvent } from '@/data/invoice-activity'
 
 const WORK_STATUS_ACTION = 'work_status.changed'
@@ -55,7 +59,7 @@ function money(v: unknown): string {
 function Strong({ children }: { children: ReactNode }) {
   return <span className="font-medium text-foreground">{children}</span>
 }
-function fromTo(c: { from: unknown; to: unknown } | undefined): ReactNode {
+function fromToText(c: { from: unknown; to: unknown } | undefined): ReactNode {
   if (!c) return null
   return c.from
     ? <>from <Strong>{valueText(c.from)}</Strong> → <Strong>{valueText(c.to)}</Strong></>
@@ -63,7 +67,7 @@ function fromTo(c: { from: unknown; to: unknown } | undefined): ReactNode {
 }
 
 // Plain-language predicate (with key values highlighted) that follows the actor name.
-function describe(e: TimelineEvent): ReactNode {
+function describe(e: TimelineEvent, statusConfigs?: WorkStatusDisplay[]): ReactNode {
   const m = (e.metadata ?? {}) as Record<string, unknown>
   const c0 = Array.isArray(e.changes) ? e.changes[0] : undefined
   switch (e.action) {
@@ -77,8 +81,18 @@ function describe(e: TimelineEvent): ReactNode {
     case 'invoice.void_restored': return <>restored the voided invoice</>
     case 'invoice.purged': return <>permanently deleted invoice</>
     case 'invoice.work_note_changed': return <>updated work note{m.item ? <> on <Strong>{String(m.item)}</Strong></> : null}</>
-    case 'invoice.service_status_changed': return <>changed service status {fromTo(c0)}</>
-    case WORK_STATUS_ACTION: return <>changed work status{m.item ? <> of <Strong>{String(m.item)}</Strong></> : null} {fromTo(c0)}</>
+    case 'invoice.service_status_changed': return <>changed service status {fromToText(c0)}</>
+    case WORK_STATUS_ACTION: {
+      const from = m.fromStatus as WorkStatus | null | undefined
+      const to = m.toStatus as WorkStatus | undefined
+      return (
+        <>
+          changed work status{m.item ? <> of <Strong>{String(m.item)}</Strong></> : null}{' '}
+          {from ? <>from <WorkStatusBadge status={from} statusConfigs={statusConfigs} /> → </> : <>to </>}
+          {to ? <WorkStatusBadge status={to} statusConfigs={statusConfigs} /> : null}
+        </>
+      )
+    }
     case 'invoice.case_changed': return <>updated case details</>
     case 'invoice.recipient_changed': return <>updated recipient details</>
     case 'invoice.edited': {
@@ -92,10 +106,16 @@ function describe(e: TimelineEvent): ReactNode {
   }
 }
 
-export function InvoiceActivityPanel({ events }: { events: TimelineEvent[] }) {
+export function InvoiceActivityPanel({
+  events,
+  statusConfigs,
+}: {
+  events: TimelineEvent[]
+  statusConfigs?: WorkStatusDisplay[]
+}) {
   const [open, setOpen] = useState<string | null>(null)
   const [showWorkStatus, setShowWorkStatus] = useState(false)
-  const [limit, setLimit] = useState(PAGE_SIZE)
+  const [page, setPage] = useState(1)
 
   // Restore the persisted preference after mount (default stays hidden for SSR).
   useEffect(() => {
@@ -106,16 +126,24 @@ export function InvoiceActivityPanel({ events }: { events: TimelineEvent[] }) {
 
   function toggleWorkStatus(next: boolean) {
     setShowWorkStatus(next)
-    setLimit(PAGE_SIZE)
+    setPage(1)
     if (typeof window !== 'undefined') window.localStorage.setItem(SHOW_WS_KEY, next ? '1' : '0')
   }
 
-  if (events.length === 0) return null
-
   const workStatusCount = events.filter(e => e.action === WORK_STATUS_ACTION).length
   const visible = showWorkStatus ? events : events.filter(e => e.action !== WORK_STATUS_ACTION)
-  const shown = visible.slice(0, limit)
-  const remaining = visible.length - shown.length
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+
+  // Keep the page in range if the visible set shrinks (e.g. after hiding work status).
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  if (events.length === 0) return null
+
+  const safePage = Math.min(page, totalPages)
+  const start = (safePage - 1) * PAGE_SIZE
+  const shown = visible.slice(start, start + PAGE_SIZE)
 
   return (
     <Card className="print:hidden">
@@ -158,7 +186,7 @@ export function InvoiceActivityPanel({ events }: { events: TimelineEvent[] }) {
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="text-sm">
                           <span className="font-medium text-foreground">{e.actorName}</span>{' '}
-                          <span className="text-muted-foreground">{describe(e)}</span>
+                          <span className="text-muted-foreground">{describe(e, statusConfigs)}</span>
                           {e.reason ? <span className="text-muted-foreground"> — {e.reason}</span> : null}
                         </p>
                         <time className="shrink-0 text-xs text-muted-foreground" title={formatDateTime(e.at)}>
@@ -191,21 +219,16 @@ export function InvoiceActivityPanel({ events }: { events: TimelineEvent[] }) {
                 )
               })}
             </ul>
-            {(remaining > 0 || limit > PAGE_SIZE) && (
-              <div className="flex items-center justify-center gap-4 border-t px-4 py-2.5 text-xs">
-                {remaining > 0 && (
-                  <button type="button" className="text-primary hover:underline" onClick={() => setLimit(l => l + PAGE_SIZE)}>
-                    Show {Math.min(PAGE_SIZE, remaining)} more
-                  </button>
-                )}
-                {remaining > 0 && <span className="text-muted-foreground">{shown.length} of {visible.length}</span>}
-                {limit > PAGE_SIZE && (
-                  <button type="button" className="text-muted-foreground hover:underline" onClick={() => setLimit(PAGE_SIZE)}>
-                    Show less
-                  </button>
-                )}
-              </div>
-            )}
+            <Pagination
+              className="border-t px-4 py-2.5 sm:px-5"
+              page={safePage}
+              totalPages={totalPages}
+              filteredCount={visible.length}
+              pageStart={start + 1}
+              pageEnd={start + shown.length}
+              onPageChange={setPage}
+              itemLabel="events"
+            />
           </>
         )}
       </CardContent>

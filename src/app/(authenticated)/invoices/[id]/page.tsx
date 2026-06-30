@@ -173,7 +173,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       )}
 
       {/* Activity timeline — who did what on this invoice. Internal, never printed. */}
-      <InvoiceActivityPanel events={activity} />
+      <InvoiceActivityPanel events={activity} statusConfigs={workStatusConfigs} />
     </div>
   )
 }
