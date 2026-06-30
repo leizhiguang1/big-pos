@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ReportInvoice } from './reports'
-import { summarizeReports } from './reports'
+import { summarizeReports, aggregateByCustomer, aggregateByProduct } from './reports'
 
 // Minimal invoice factory — only the fields the summary reads.
 const ri = (over: Partial<ReportInvoice> = {}): ReportInvoice => ({
@@ -64,5 +64,31 @@ describe('summarizeReports', () => {
     const names = r.byProduct.map(p => p.name)
     expect(names).toContain('Crown')
     expect(names).toContain('Custom job')
+  })
+})
+
+describe('aggregation limit', () => {
+  const clinics = Array.from({ length: 15 }, (_, i) =>
+    ri({ total: i + 1, customers: { clinic_name: `C${i}` } }),
+  )
+  const products = Array.from({ length: 15 }, (_, i) =>
+    ri({ invoice_items: [{ description: `P${i}`, amount: i + 1, quantity: 1 }] }),
+  )
+
+  it('aggregateByCustomer defaults to top 10', () => {
+    expect(aggregateByCustomer(clinics)).toHaveLength(10)
+  })
+  it('aggregateByCustomer returns all rows when limit is Infinity', () => {
+    expect(aggregateByCustomer(clinics, Infinity)).toHaveLength(15)
+  })
+  it('aggregateByProduct defaults to top 10', () => {
+    expect(aggregateByProduct(products)).toHaveLength(10)
+  })
+  it('aggregateByProduct returns all rows when limit is Infinity', () => {
+    expect(aggregateByProduct(products, Infinity)).toHaveLength(15)
+  })
+  it('summarizeReports returns full breakdowns, not just top 10', () => {
+    const r = summarizeReports(clinics, NOW)
+    expect(r.byCustomer).toHaveLength(15)
   })
 })

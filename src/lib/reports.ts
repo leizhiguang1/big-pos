@@ -41,10 +41,10 @@ export type ReportSummary = {
 const DAY_MS = 86_400_000
 
 /**
- * Revenue grouped by clinic, descending, top 10. Shared by the reports and
+ * Revenue grouped by clinic, descending, top 10 by default. Shared by the reports and
  * dashboard summaries. `invoices` should already exclude voided rows.
  */
-export function aggregateByCustomer(invoices: ReportInvoice[]): CustomerAgg[] {
+export function aggregateByCustomer(invoices: ReportInvoice[], limit = 10): CustomerAgg[] {
   return Object.values(
     invoices.reduce<Record<string, CustomerAgg>>((acc, inv) => {
       const name = inv.customers?.clinic_name ?? 'Unknown'
@@ -53,15 +53,15 @@ export function aggregateByCustomer(invoices: ReportInvoice[]): CustomerAgg[] {
       acc[name].count += 1
       return acc
     }, {}),
-  ).sort((a, b) => b.total - a.total).slice(0, 10)
+  ).sort((a, b) => b.total - a.total).slice(0, limit)
 }
 
 /**
  * Revenue grouped by product (falling back to the line description when a line
- * has no linked product), descending, top 10. Shared by reports and dashboard.
+ * has no linked product), descending, top 10 by default. Shared by reports and dashboard.
  * `invoices` should already exclude voided rows.
  */
-export function aggregateByProduct(invoices: ReportInvoice[]): ProductAgg[] {
+export function aggregateByProduct(invoices: ReportInvoice[], limit = 10): ProductAgg[] {
   const map: Record<string, ProductAgg> = {}
   invoices.forEach((inv) => {
     ;(inv.invoice_items ?? []).forEach((item) => {
@@ -71,7 +71,7 @@ export function aggregateByProduct(invoices: ReportInvoice[]): ProductAgg[] {
       map[name].qty += Number(item.quantity)
     })
   })
-  return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 10)
+  return Object.values(map).sort((a, b) => b.total - a.total).slice(0, limit)
 }
 
 /**
@@ -95,8 +95,8 @@ export function summarizeReports(invoices: ReportInvoice[], nowMs: number): Repo
     .filter((i) => i.status === 'paid')
     .sort((a, b) => (a.invoice_date < b.invoice_date ? 1 : -1))
 
-  const byCustomer = aggregateByCustomer(active)
-  const byProduct = aggregateByProduct(active)
+  const byCustomer = aggregateByCustomer(active, Infinity)
+  const byProduct = aggregateByProduct(active, Infinity)
 
   return {
     totalInvoiced,
