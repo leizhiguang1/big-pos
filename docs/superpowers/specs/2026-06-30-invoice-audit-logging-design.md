@@ -39,8 +39,8 @@ semantic events and money-aware labels that triggers can't easily produce.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `uuid` PK | `gen_random_uuid()` |
-| `invoice_id` | `uuid` | FK → `invoices(id)` **ON DELETE SET NULL** (survives purge) |
-| `actor_id` | `uuid` NOT NULL | FK → `auth.users(id)` |
+| `invoice_id` | `uuid` | **no FK** (plain uuid; survives purge) — mirrors `admin_audit_log` |
+| `actor_id` | `uuid` NOT NULL | **no FK** (plain uuid) — mirrors `admin_audit_log.actor_id` |
 | `actor_name` | `text` NOT NULL | snapshot of `profiles.full_name` (fallback `username`) at write time |
 | `action` | `text` NOT NULL | semantic key, e.g. `invoice.issued`, `payment.recorded` |
 | `entity_label` | `text` | snapshot of `invoice_number` (survives purge) |
@@ -169,7 +169,9 @@ Applied via MCP `apply_migration`. New file sorts after the latest
 
 1. Create `invoice_activity_log` table + indexes + RLS (enabled, no policies, mirroring
    `admin_audit_log`) + append-only `BEFORE UPDATE OR DELETE` trigger that raises.
-   `actor_id` FK → `auth.users(id)` (no cascade); `invoice_id` FK → `invoices(id)` ON DELETE SET NULL.
+   **No foreign keys** — `actor_id`/`invoice_id` are plain uuids (mirrors `admin_audit_log`); this
+   avoids the FK cascade firing an UPDATE on the append-only log during invoice purge, and lets the
+   audit trail survive a purged invoice.
 2. One-time backfill from known columns, **joining `profiles` for `actor_name`**
    (`coalesce(full_name, username, '(unknown)')`):
    - `invoice.created` from `invoices.created_by` / `created_at`;
