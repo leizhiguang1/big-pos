@@ -5,7 +5,7 @@
 
 import { redirect } from 'next/navigation'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
-import { getReportInvoices } from '@/data/reports'
+import { getReportInvoices, getReportPayments } from '@/data/reports'
 import { summarizeReports } from '@/lib/reports'
 import { buildPresets } from '@/lib/reports-presets'
 import { requirePermission } from '@/lib/auth/require-permission'
@@ -24,9 +24,12 @@ export default async function ReportsPage({
   const from = sp.from ?? format(startOfMonth(now), 'yyyy-MM-dd')
   const to = sp.to ?? format(endOfMonth(now), 'yyyy-MM-dd')
 
-  const invoices = await getReportInvoices(from, to)
+  const [invoices, payments] = await Promise.all([
+    getReportInvoices(from, to),
+    getReportPayments(from, to),
+  ])
   const summary = summarizeReports(invoices, now.getTime())
   const presets = buildPresets(now)
 
-  return <ReportsClient from={from} to={to} summary={summary} presets={presets} />
+  return <ReportsClient from={from} to={to} summary={summary} presets={presets} payments={payments} />
 }

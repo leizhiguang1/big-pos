@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download } from 'lucide-react'
+import { Download, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,7 +14,16 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { formatCurrency, formatDate, todayISODate } from '@/lib/utils'
 import { statusBadgeVariant, paymentStatusLabel } from '@/lib/status-badge'
 import type { ReportSummary } from '@/lib/reports'
-import { buildReportCsv, reportCsvFilename } from '@/lib/reports-csv'
+import {
+  buildSalesReportCsv,
+  buildPaymentReportCsv,
+  buildItemSalesReportCsv,
+  salesReportFilename,
+  paymentReportFilename,
+  itemSalesReportFilename,
+} from '@/lib/reports-exports'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import type { ReportPayment } from '@/lib/reports'
 import { matchPreset, PRESET_LABELS, type PresetKind, type PresetMap } from '@/lib/reports-presets'
 
 const BRAND_CHART = '#766254'
@@ -23,7 +32,7 @@ const BRAND_CHART_SOFT = '#9b8779'
 // Interactive shell for the reports page. The Server Component fetches + computes
 // `summary`; this island renders it and drives the date range through the URL so
 // a change re-runs the server query. `isPending` shows the in-flight spinner.
-export function ReportsClient({ from, to, summary, presets }: { from: string; to: string; summary: ReportSummary; presets: PresetMap }) {
+export function ReportsClient({ from, to, summary, presets, payments }: { from: string; to: string; summary: ReportSummary; presets: PresetMap; payments: ReportPayment[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -32,20 +41,24 @@ export function ReportsClient({ from, to, summary, presets }: { from: string; to
     startTransition(() => router.push(`/reports?${params.toString()}`))
   }
 
-  // Download the whole report (all sections) for the selected range as one CSV.
-  // The leading BOM makes Excel open the UTF-8 file with clinic names intact.
-  const exportCsv = () => {
-    const csv = buildReportCsv(summary, { from, to }, todayISODate())
+  // Download a CSV string as a file. The leading BOM makes Excel open the UTF-8
+  // file with clinic names intact.
+  const download = (csv: string, filename: string) => {
     const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = reportCsvFilename({ from, to })
+    a.download = filename
     document.body.appendChild(a)
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
   }
+
+  const range = { from, to }
+  const exportSales = () => download(buildSalesReportCsv(summary.sales, range, todayISODate()), salesReportFilename(range))
+  const exportPayments = () => download(buildPaymentReportCsv(payments, range, todayISODate()), paymentReportFilename(range))
+  const exportItems = () => download(buildItemSalesReportCsv(summary.byProduct, range, todayISODate()), itemSalesReportFilename(range))
 
   const { totalInvoiced, totalPaidInvoices, totalOutstanding, invoiceCount, outstanding, paid, byCustomer, byProduct } = summary
   const activeRange = matchPreset(from, to, presets)
@@ -85,15 +98,20 @@ export function ReportsClient({ from, to, summary, presets }: { from: string; to
           <Input type="date" value={to} onChange={e => setRange({ to: e.target.value })} className="w-full sm:w-40" />
         </div>
         {isPending && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mb-2" />}
-        <Button
-          variant="outline"
-          onClick={exportCsv}
-          disabled={invoiceCount === 0}
-          className="w-full sm:w-auto sm:ml-auto"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" disabled={invoiceCount === 0} className="w-full sm:w-auto sm:ml-auto">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={exportSales}>Sales Report</DropdownMenuItem>
+            <DropdownMenuItem onSelect={exportPayments}>Payment Report</DropdownMenuItem>
+            <DropdownMenuItem onSelect={exportItems}>Item Sales Report</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Summary cards */}
